@@ -12,8 +12,11 @@ const DEFAULTS = {
   // update. Expired/cancelled/archived runs are dropped immediately.
   retentionMinutes: { done: 60, error: 240 },
   syntheticErrorRow: true, // one clickable "<vendor>: auth failed" row per broken vendor
-  cursor: { enabled: true, apiKey: "", openIn: "web", recentHours: 48 },
-  devin: { enabled: true, apiKey: "", recentHours: 48, showSuspended: false },
+  // openIn "app" = the vendor's desktop app (cursor:// run deep link; devin://
+  // focuses Devin Desktop — no per-session deep link exists); "web" = the
+  // thread-precise browser URL.
+  cursor: { enabled: true, apiKey: "", openIn: "app", recentHours: 48 },
+  devin: { enabled: true, apiKey: "", openIn: "app", recentHours: 48, showSuspended: false },
   codex: { enabled: true, bin: "codex", pollSeconds: 60, recentHours: 48 },
 };
 

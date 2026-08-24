@@ -69,8 +69,14 @@ test("devin: status_enum mapping — blocked is question, never permission", () 
   assert.equal(byId["devin-fin"].recap, "https://github.com/x/y/pull/7");
   assert.equal(byId["devin-susp"].state, null); // hidden: showSuspended defaults false
   assert.equal(byId["devin-old"].state, null);  // expired: dropped
-  assert.equal(byId["devin-abc123"].url, "https://app.devin.ai/sessions/devin-abc123");
+  assert.equal(byId["devin-abc123"].url, "devin://"); // default: focus Devin Desktop
   assert.deepEqual(warnings, []);
+});
+
+test("devin: openIn web yields the thread-precise browser URL", () => {
+  const { rows } = devin.normalize(devinFixture, { ...DEFAULTS.devin, openIn: "web" }, NOW);
+  assert.equal(rows.find((r) => r.id === "devin-abc123").url,
+    "https://app.devin.ai/sessions/devin-abc123");
 });
 
 test("devin: showSuspended surfaces suspended sessions as idle", () => {
@@ -102,14 +108,14 @@ test("cursor: run status wins; archived agents are dropped", () => {
   assert.equal(rows.length, 2);
   assert.equal(rows[0].state, "thinking");
   assert.equal(rows[0].project, "Fix login bug");
-  assert.match(rows[0].url, /^https:\/\/cursor\.com\/agents\//);
+  assert.match(rows[0].url, /^cursor:\/\/anysphere\.cursor-deeplink\/background-agent\?bcId=/);
   assert.equal(rows[1].state, "error");
   assert.deepEqual(warnings, []);
 });
 
-test("cursor: openIn app switches the url to the deep link", () => {
-  const { rows } = cursor.normalize(cursorFixture, { ...DEFAULTS.cursor, openIn: "app" }, NOW);
-  assert.match(rows[0].url, /^cursor:\/\/anysphere\.cursor-deeplink\/background-agent\?bcId=/);
+test("cursor: openIn web switches the url to the browser link", () => {
+  const { rows } = cursor.normalize(cursorFixture, { ...DEFAULTS.cursor, openIn: "web" }, NOW);
+  assert.match(rows[0].url, /^https:\/\/cursor\.com\/agents\//);
 });
 
 test("cursor: v0 shape (status on the agent, no runs) still normalizes", () => {

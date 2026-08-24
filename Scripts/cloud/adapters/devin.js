@@ -52,7 +52,12 @@ const normalize = (raw, cfg, now) => {
       project: s.title || "Devin session",
       prompt: s.title || "",
       recap: state === "done" ? s.pull_request?.url || "" : "",
-      url: s.url || `https://app.devin.ai/sessions/${encodeURIComponent(id)}`,
+      // "app" focuses Devin Desktop, which syncs cloud sessions into its Agent
+      // Command Center — but exposes no per-session deep link (its own "copy
+      // link" yields the web URL), so thread-precision needs openIn: "web".
+      url: cfg.openIn === "web"
+        ? s.url || `https://app.devin.ai/sessions/${encodeURIComponent(id)}`
+        : "devin://",
       started_at: epoch(s.created_at) || 0,
       updated_at: epoch(s.updated_at) || now,
       recentHours: cfg.recentHours,
