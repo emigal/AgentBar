@@ -35,7 +35,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         menu.delegate = self
         statusItem.menu = menu
         UpdateChecker.shared.onChange = { [weak self] in self?.refreshOpenMenu() }
-        UpdateChecker.shared.startPeriodicChecks()
+        // Fork: no periodic update checks — this build is maintained by rebasing on
+        // upstream and rebuilding locally; a background self-replace would revert it.
         applyHotKeyState()
         mascot.sink("statusItem") { [weak self] image, word in
             guard let button = self?.statusItem.button else { return }

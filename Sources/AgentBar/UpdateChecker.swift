@@ -18,7 +18,9 @@ final class UpdateChecker {
     /// Fired on the main queue whenever `status` changes (menu refresh hook).
     var onChange: (() -> Void)?
 
-    private static let repo = "michalstrnadel/AgentBar"
+    // Fork: point at the fork so a manual check can never install upstream's
+    // bundle over local changes. The fork publishes no releases, so checks no-op.
+    private static let repo = "emigal/AgentBar"
     private var zipURL: URL?
     private var timer: Timer?
 
