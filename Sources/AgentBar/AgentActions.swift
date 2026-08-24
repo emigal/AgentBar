@@ -24,6 +24,8 @@ enum AgentActions {
             // CLI-only agents open into the user's terminal (chosen in Open ▸ Terminal,
             // or auto-detected from the most recent session).
             TerminalApp.preferred(sessions: currentSessions()).open()
+        case .url(let s):
+            if let url = URL(string: s) { ws.open(url) }
         }
     }
 
