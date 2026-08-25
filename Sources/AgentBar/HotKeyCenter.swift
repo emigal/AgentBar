@@ -13,8 +13,10 @@ struct KeyCombo: Equatable {
                                        carbonModifiers: UInt32(optionKey | cmdKey), display: "⌥⌘A")
     static let defaultDeny = KeyCombo(keyCode: UInt32(kVK_ANSI_D),
                                       carbonModifiers: UInt32(optionKey | cmdKey), display: "⌥⌘D")
+    // ⌃M globally: worth knowing it shadows the terminal byte for Return (^M) —
+    // rarely typed as such, and one re-record in Settings moves it if it bites.
     static let defaultMenu = KeyCombo(keyCode: UInt32(kVK_ANSI_M),
-                                      carbonModifiers: UInt32(optionKey | cmdKey), display: "⌥⌘M")
+                                      carbonModifiers: UInt32(controlKey), display: "⌃M")
 
     /// The currently configured combos (defaults when never customized).
     static var allow: KeyCombo { stored("allowHotKey", fallback: .defaultAllow) }
