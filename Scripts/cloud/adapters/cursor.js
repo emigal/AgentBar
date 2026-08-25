@@ -54,11 +54,27 @@ const fetchRaw = async (cfg) => {
       runs[a.id] = cached.run;
       continue;
     }
-    runs[a.id] = await get(`${base}/v1/agents/${a.id}/runs/${a.latestRunId}`, cfg.apiKey);
-    runCache.set(a.id, { latestRunId: a.latestRunId, run: runs[a.id] });
+    // The runs LIST is the working endpoint (newest first); run-by-id 404s in
+    // practice despite being documented. Best-effort per agent: one broken
+    // agent must not blank the whole vendor's rows.
+    try {
+      const r = await get(`${base}/v1/agents/${a.id}/runs`, cfg.apiKey);
+      const items = r.items || r.runs || [];
+      const run = items.find((x) => x.id === a.latestRunId) || items[0];
+      if (run) {
+        runs[a.id] = run;
+        runCache.set(a.id, { latestRunId: a.latestRunId, run });
+      }
+    } catch (e) {
+      if (!warnedAgents.has(a.id)) {
+        warnedAgents.add(a.id);
+        console.error(`[cursor] runs fetch failed for ${a.id}: ${e.message}`);
+      }
+    }
   }
   return { agents, runs };
 };
+const warnedAgents = new Set();
 
 const LABELS = { thinking: "Working", done: "Ready for review", error: "Failed" };
 

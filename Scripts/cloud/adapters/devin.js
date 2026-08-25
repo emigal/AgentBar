@@ -22,11 +22,16 @@ const STATES = {
   suspended: "suspended",
 };
 
+// cog_ keys (service users / PATs) authorize only the v3 org-scoped API and
+// need `orgId` from Settings -> Service Users; legacy apk_ keys use v1.
 const fetchRaw = async (cfg) => {
-  const res = await fetch("https://api.devin.ai/v1/sessions?limit=50", {
+  const path = cfg.orgId
+    ? `/v3/organizations/${encodeURIComponent(cfg.orgId)}/sessions?limit=50`
+    : "/v1/sessions?limit=50";
+  const res = await fetch(`https://api.devin.ai${path}`, {
     headers: { Authorization: `Bearer ${cfg.apiKey}` },
   });
-  if (!res.ok) throw new Error(`devin /v1/sessions: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`devin ${path.split("?")[0]}: HTTP ${res.status}`);
   return res.json();
 };
 
@@ -35,7 +40,7 @@ const LABELS = { thinking: "Working", question: "Needs your input", done: "Finis
 const normalize = (raw, cfg, now) => {
   const rows = [];
   const warnings = [];
-  for (const s of raw.sessions || raw.items || []) {
+  for (const s of raw.sessions || raw.items || raw.data || []) {
     const key = String(s.status_enum || s.status || "").toLowerCase();
     let state = STATES[key];
     if (state === undefined) {
@@ -52,12 +57,13 @@ const normalize = (raw, cfg, now) => {
       project: s.title || "Devin session",
       prompt: s.title || "",
       recap: state === "done" ? s.pull_request?.url || "" : "",
-      // "app" focuses Devin Desktop, which syncs cloud sessions into its Agent
-      // Command Center — but exposes no per-session deep link (its own "copy
-      // link" yields the web URL), so thread-precision needs openIn: "web".
+      // "app" opens the exact thread in Devin Desktop via its ACP URL handler
+      // (undocumented; recovered from the IDE bundle): a session synced into the
+      // Agent Command Center activates in-app, and the handler itself falls back
+      // to the web thread URL when it isn't. "web" skips the app entirely.
       url: cfg.openIn === "web"
         ? s.url || `https://app.devin.ai/sessions/${encodeURIComponent(id)}`
-        : "devin://",
+        : `devin://acp/session?sessionId=${encodeURIComponent(id)}&connectorId=devin-cloud`,
       started_at: epoch(s.created_at) || 0,
       updated_at: epoch(s.updated_at) || now,
       recentHours: cfg.recentHours,

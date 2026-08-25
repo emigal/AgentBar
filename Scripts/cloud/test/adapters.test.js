@@ -69,7 +69,8 @@ test("devin: status_enum mapping — blocked is question, never permission", () 
   assert.equal(byId["devin-fin"].recap, "https://github.com/x/y/pull/7");
   assert.equal(byId["devin-susp"].state, null); // hidden: showSuspended defaults false
   assert.equal(byId["devin-old"].state, null);  // expired: dropped
-  assert.equal(byId["devin-abc123"].url, "devin://"); // default: focus Devin Desktop
+  assert.equal(byId["devin-abc123"].url, // default: exact thread in Devin Desktop
+    "devin://acp/session?sessionId=devin-abc123&connectorId=devin-cloud");
   assert.deepEqual(warnings, []);
 });
 

@@ -16,7 +16,7 @@ const DEFAULTS = {
   // focuses Devin Desktop — no per-session deep link exists); "web" = the
   // thread-precise browser URL.
   cursor: { enabled: true, apiKey: "", openIn: "app", recentHours: 48 },
-  devin: { enabled: true, apiKey: "", openIn: "app", recentHours: 48, showSuspended: false },
+  devin: { enabled: true, apiKey: "", orgId: "", openIn: "app", recentHours: 48, showSuspended: false },
   codex: { enabled: true, bin: "codex", pollSeconds: 60, recentHours: 48 },
 };
 
