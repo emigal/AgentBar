@@ -6,18 +6,23 @@ enum MenuBuilder {
                          controller: StatusItemController) {
         menu.removeAllItems()
 
-        // Sessions: live work top-level, newest-started first — the session you
-        // just kicked off is the one you're most likely reaching for. The Idle
-        // section sorts by ts, which for a resting row is when it last actually
-        // worked (local hooks stop writing at the finish; the cloud poller pins
-        // ts to the vendor's last update) — so: most recently finished first.
-        let resting = sessions.filter { $0.state == .done || $0.state == .idle }
+        // Three sections, newest first in each. Active sorts newest-started —
+        // the session you just kicked off is the one you're most likely reaching
+        // for. Done (finished, not yet jumped to — blue dot) and Idle (finished
+        // and seen, or resting/suspended) sort by ts, which for a finished row
+        // is when it last actually worked (local hooks stop writing at the
+        // finish; the cloud poller pins ts to the vendor's last update) — so:
+        // most recently finished first. Clicking a Done row marks the finish
+        // seen (the same set the bar dots read); the next open files it under Idle.
+        let done = sessions.filter { category($0, controller: controller) == .done }
             .sorted { $0.ts > $1.ts }
-        let active = sessions.filter { !($0.state == .done || $0.state == .idle) }
+        let idle = sessions.filter { category($0, controller: controller) == .idle }
+            .sorted { $0.ts > $1.ts }
+        let active = sessions.filter { category($0, controller: controller) == .active }
             .sorted { ($0.startedAt > 0 ? $0.startedAt : $0.ts)
                     > ($1.startedAt > 0 ? $1.startedAt : $1.ts) }
-        menu.addItem(header("Sessions"))
-        if sessions.isEmpty {
+        menu.addItem(header("Active"))
+        if active.isEmpty {
             let none = NSMenuItem(title: "No active sessions", action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
@@ -27,7 +32,7 @@ enum MenuBuilder {
                                       keyEquivalent: "")
                 item.target = controller
                 item.representedObject = s
-                item.attributedTitle = rowTitle(s)
+                item.attributedTitle = rowTitle(s, controller: controller)
                 item.toolTip = rowToolTip(s)
                 let sessionRequests = requests.filter { $0.sessionId == s.id }
                 // Cloud rows get no approval affordances: there is no local hook a
@@ -61,21 +66,22 @@ enum MenuBuilder {
                 }
                 menu.addItem(item)
             }
-            if !resting.isEmpty {
-                // Finished and idle sessions sit under their own header, listed
-                // plainly in the main menu — one flat, arrow-navigable list.
-                menu.addItem(header("Idle"))
-                for s in resting {
-                    let item = NSMenuItem(title: "",
-                                          action: #selector(StatusItemController.sessionRowClicked(_:)),
-                                          keyEquivalent: "")
-                    item.identifier = NSUserInterfaceItemIdentifier("idleRow")
-                    item.target = controller
-                    item.representedObject = s
-                    item.attributedTitle = rowTitle(s)
-                    item.toolTip = rowToolTip(s)
-                    menu.addItem(item)
-                }
+        }
+        // Finished and resting sessions sit under their own headers, listed
+        // plainly in the main menu — flat, arrow-navigable lists.
+        for (title, rows, id) in [("Done", done, "doneRow"), ("Idle", idle, "idleRow")]
+        where !rows.isEmpty {
+            menu.addItem(header(title))
+            for s in rows {
+                let item = NSMenuItem(title: "",
+                                      action: #selector(StatusItemController.sessionRowClicked(_:)),
+                                      keyEquivalent: "")
+                item.identifier = NSUserInterfaceItemIdentifier(id)
+                item.target = controller
+                item.representedObject = s
+                item.attributedTitle = rowTitle(s, controller: controller)
+                item.toolTip = rowToolTip(s)
+                menu.addItem(item)
             }
         }
 
@@ -247,16 +253,34 @@ enum MenuBuilder {
         return item
     }
 
+    /// Which menu section a session files under. Finished work (done or error)
+    /// sits in Done until the user jumps to it, then rests in Idle alongside
+    /// resting (e.g. suspended cloud) sessions.
+    private enum Category { case active, done, idle }
+
+    private static func category(_ s: Session, controller: StatusItemController) -> Category {
+        switch s.state {
+        case .done, .error: return controller.finishSeen(s) ? .idle : .done
+        case .idle:         return .idle
+        default:            return .active
+        }
+    }
+
     /// "● project · branch   AGENT" — dot colored by state, agent tag dimmed.
-    private static func rowTitle(_ s: Session) -> NSAttributedString {
+    /// Dot language (state, not brand): amber = needs you, orange = working,
+    /// blue = finished and not yet seen, red = failed and not yet seen,
+    /// gray = seen or resting.
+    private static func rowTitle(_ s: Session, controller: StatusItemController) -> NSAttributedString {
         let agent = Agent.byID(s.agentID)
+        let seen = controller.finishSeen(s)
         let dotColor: NSColor
         switch s.state {
-        case .permission:      dotColor = IconRenderer.amberDot
-        case .question:        dotColor = IconRenderer.questionDot
-        case .thinking, .tool: dotColor = agent.brand
-        case .error:           dotColor = .systemRed
-        case .idle, .done:     dotColor = .tertiaryLabelColor
+        case .permission,
+             .question:        dotColor = IconRenderer.amberDot
+        case .thinking, .tool: dotColor = .systemOrange
+        case .error:           dotColor = seen ? .tertiaryLabelColor : .systemRed
+        case .done:            dotColor = seen ? .tertiaryLabelColor : .systemBlue
+        case .idle:            dotColor = .tertiaryLabelColor
         }
 
         let title = NSMutableAttributedString()
@@ -509,20 +533,31 @@ enum MenuBuilder {
     static func updateInPlace(_ menu: NSMenu, sessions: [Session], requests: [ApprovalRequest],
                               controller: StatusItemController) -> Bool {
         var displayedActive = Set<String>()
+        var displayedDone = Set<String>()
         var displayedIdle = Set<String>()
         var displayedRequests = Set<String>()
         for item in menu.items {
             if let tag = requestTag(item) { displayedRequests.insert(tag); continue }
             guard let s = item.representedObject as? Session else { continue }
-            if item.identifier?.rawValue == "idleRow" { displayedIdle.insert(s.id) }
-            else { displayedActive.insert(s.id) }
+            switch item.identifier?.rawValue {
+            case "doneRow": displayedDone.insert(s.id)
+            case "idleRow": displayedIdle.insert(s.id)
+            default:        displayedActive.insert(s.id)
+            }
         }
-        // A session that crossed between live work and the Idle section is a
-        // structure change — only a rebuild can move its row.
-        let restingIDs = Set(sessions.filter { $0.state == .done || $0.state == .idle }.map(\.id))
-        let activeIDs = Set(sessions.map(\.id)).subtracting(restingIDs)
-        guard activeIDs.isSubset(of: displayedActive),
-              restingIDs.isSubset(of: displayedIdle),
+        // A session that crossed between sections is a structure change — only
+        // a rebuild can move its row.
+        var liveActive = Set<String>(), liveDone = Set<String>(), liveIdle = Set<String>()
+        for s in sessions {
+            switch category(s, controller: controller) {
+            case .active: liveActive.insert(s.id)
+            case .done:   liveDone.insert(s.id)
+            case .idle:   liveIdle.insert(s.id)
+            }
+        }
+        guard liveActive.isSubset(of: displayedActive),
+              liveDone.isSubset(of: displayedDone),
+              liveIdle.isSubset(of: displayedIdle),
               Set(requests.map(\.fileName)).isSubset(of: displayedRequests) else { return false }
 
         let live = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
@@ -537,7 +572,7 @@ enum MenuBuilder {
             if let s = item.representedObject as? Session {
                 if let updated = live[s.id] {
                     item.representedObject = updated
-                    item.attributedTitle = rowTitle(updated)
+                    item.attributedTitle = rowTitle(updated, controller: controller)
                     item.toolTip = rowToolTip(updated)
                     // Keystroke fallback appears/disappears with the permission state.
                     let hasStrip = requests.contains { $0.sessionId == updated.id }

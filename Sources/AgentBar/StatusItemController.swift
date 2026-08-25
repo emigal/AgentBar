@@ -88,6 +88,10 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         renderStatusIcon()
     }
 
+    /// Whether the user has already jumped to this session's finish — the menu's
+    /// Done/Idle split reads the same set the bar dots do.
+    func finishSeen(_ s: Session) -> Bool { openedFinished.contains(s.id) }
+
     private var pulseTimer: Timer?
     private var pulsePhase = 0.0
     private var cachedBase: NSImage?
