@@ -84,6 +84,13 @@ don't use. Hooks are snapshotted per session — start a new agent session after
 - **Two looks** — full-color mascots, or a monochrome System mode that matches the menu bar.
 - **Remote Allow/Deny** — answer Claude Code permission prompts straight from the menu:
   see exactly what's requested, then Allow once, Always allow, Deny, or defer to terminal.
+- **Global shortcuts** — **⌘M** pops the menu from anywhere (on by default; rebind
+  or disable it via **Global shortcuts…** in the menu). Opt-in **⌥⌘A** / **⌥⌘D**
+  answer the newest pending request without leaving your editor. While AgentBar
+  runs, its ⌘M wins over macOS's Minimize; to keep Minimize out of the way even
+  when it isn't running, remap it off ⌘M system-wide:
+  `defaults write -g NSUserKeyEquivalents -dict-add Minimize '@~^$m'`
+  (undo with `defaults delete -g NSUserKeyEquivalents`; apps pick it up on relaunch).
 - **Answer questions too** — when Claude asks a multiple-choice question, the island
   and the menu show the actual options: tap one and the session continues, no
   terminal switch. The terminal wizard stays live the whole time — whoever answers
