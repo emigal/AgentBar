@@ -258,4 +258,49 @@ final class IconRenderer {
         guard let tiff = src.tiffRepresentation else { return nil }
         return NSBitmapImageRep(data: tiff)
     }
+
+    // MARK: - Status item: small mark + one dot per session
+
+    /// What one status dot says about its session.
+    enum StatusDot {
+        case blocked  // needs the user (permission / question / error) — red
+        case done     // finished — blue
+        case working  // thinking/tool — bar-ink white, pulsing
+    }
+
+    /// The whole status item image: the (small) Claude mark with a dot per live
+    /// session at its side. `pulse` is the working dots' current alpha; template
+    /// bases are inked with labelColor inside the drawing handler so the mark
+    /// adapts to the bar while the dots keep their colors.
+    static func statusIcon(base: NSImage, baseIsTemplate: Bool,
+                           dots: [StatusDot], pulse: CGFloat) -> NSImage {
+        let dot: CGFloat = 5.5, gap: CGFloat = 3.5, lead: CGFloat = 5
+        let h: CGFloat = 18
+        let dotsW = dots.isEmpty ? 0 : lead + CGFloat(dots.count) * dot
+            + CGFloat(dots.count - 1) * gap
+        let size = NSSize(width: base.size.width + dotsW, height: h)
+        let out = NSImage(size: size, flipped: false) { _ in
+            let baseRect = NSRect(x: 0, y: (h - base.size.height) / 2,
+                                  width: base.size.width, height: base.size.height)
+            base.draw(in: baseRect)
+            if baseIsTemplate {
+                NSColor.labelColor.setFill()
+                baseRect.fill(using: .sourceAtop)
+            }
+            var x = base.size.width + lead
+            for d in dots {
+                switch d {
+                case .blocked: NSColor.systemRed.setFill()
+                case .done:    NSColor.systemBlue.setFill()
+                case .working: NSColor.labelColor.withAlphaComponent(pulse).setFill()
+                }
+                NSBezierPath(ovalIn: NSRect(x: x, y: (h - dot) / 2,
+                                            width: dot, height: dot)).fill()
+                x += dot + gap
+            }
+            return true
+        }
+        out.isTemplate = false // the dots must keep their colors in System mode
+        return out
+    }
 }

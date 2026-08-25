@@ -6,14 +6,17 @@ enum MenuBuilder {
                          controller: StatusItemController) {
         menu.removeAllItems()
 
-        // Sessions
+        // Sessions: live work top-level; finished and idle rows fold into one
+        // expandable so a busy day doesn't scroll the menu.
+        let resting = sessions.filter { $0.state == .done || $0.state == .idle }
+        let active = sessions.filter { !($0.state == .done || $0.state == .idle) }
         menu.addItem(header("Sessions"))
         if sessions.isEmpty {
             let none = NSMenuItem(title: "No active sessions", action: nil, keyEquivalent: "")
             none.isEnabled = false
             menu.addItem(none)
         } else {
-            for s in sessions {
+            for s in active {
                 let item = NSMenuItem(title: "", action: #selector(StatusItemController.sessionRowClicked(_:)),
                                       keyEquivalent: "")
                 item.target = controller
@@ -51,6 +54,26 @@ enum MenuBuilder {
                     continue
                 }
                 menu.addItem(item)
+            }
+            if !resting.isEmpty {
+                let parent = NSMenuItem(title: "Idle (\(resting.count))", action: nil,
+                                        keyEquivalent: "")
+                parent.identifier = NSUserInterfaceItemIdentifier("idleParent")
+                parent.image = NSImage(systemSymbolName: "moon.zzz", accessibilityDescription: nil)
+                let sub = NSMenu()
+                sub.delegate = controller // report open/close so live refresh holds off
+                for s in resting {
+                    let item = NSMenuItem(title: "",
+                                          action: #selector(StatusItemController.sessionRowClicked(_:)),
+                                          keyEquivalent: "")
+                    item.target = controller
+                    item.representedObject = s
+                    item.attributedTitle = rowTitle(s)
+                    item.toolTip = rowToolTip(s)
+                    sub.addItem(item)
+                }
+                parent.submenu = sub
+                menu.addItem(parent)
             }
         }
 
@@ -139,8 +162,8 @@ enum MenuBuilder {
                                    accessibilityDescription: nil)
         menu.addItem(appearance)
 
-        // Opt-in global Allow/Deny shortcut; the row opens Settings (enable + rebind).
-        let shortcut = NSMenuItem(title: "Global Allow / Deny shortcut…",
+        // Global shortcuts (Allow/Deny + open menu); the row opens Settings.
+        let shortcut = NSMenuItem(title: "Global shortcuts…",
                                   action: #selector(StatusItemController.openShortcutSettings(_:)),
                                   keyEquivalent: "")
         shortcut.identifier = NSUserInterfaceItemIdentifier("shortcutRow")
@@ -483,16 +506,40 @@ enum MenuBuilder {
 
     static func updateInPlace(_ menu: NSMenu, sessions: [Session], requests: [ApprovalRequest],
                               controller: StatusItemController) -> Bool {
-        var displayedSessions = Set<String>()
+        var displayedTop = Set<String>()
+        var displayedIdle = Set<String>()
         var displayedRequests = Set<String>()
+        var idleSub: NSMenu?
         for item in menu.items {
             if let tag = requestTag(item) { displayedRequests.insert(tag); continue }
-            if let s = item.representedObject as? Session { displayedSessions.insert(s.id) }
+            if let s = item.representedObject as? Session { displayedTop.insert(s.id) }
+            if item.identifier?.rawValue == "idleParent", let sub = item.submenu {
+                idleSub = sub
+                for it in sub.items where it.representedObject is Session {
+                    displayedIdle.insert((it.representedObject as! Session).id)
+                }
+            }
         }
-        guard Set(sessions.map(\.id)).isSubset(of: displayedSessions),
+        // A session that crossed between live work and the Idle group is a
+        // structure change — only a rebuild can move its row.
+        let restingIDs = Set(sessions.filter { $0.state == .done || $0.state == .idle }.map(\.id))
+        let activeIDs = Set(sessions.map(\.id)).subtracting(restingIDs)
+        guard activeIDs.isSubset(of: displayedTop),
+              restingIDs.isSubset(of: displayedIdle),
               Set(requests.map(\.fileName)).isSubset(of: displayedRequests) else { return false }
 
         let live = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        // Idle rows are plain: title, tooltip, payload — no strips, no submenus.
+        for item in idleSub?.items ?? [] {
+            guard let s = item.representedObject as? Session else { continue }
+            if let updated = live[s.id] {
+                item.representedObject = updated
+                item.attributedTitle = rowTitle(updated)
+                item.toolTip = rowToolTip(updated)
+            } else {
+                item.attributedTitle = endedRowTitle(s)
+            }
+        }
         let liveRequests = Set(requests.map(\.fileName))
         for item in menu.items {
             // Request-tagged rows first: a question's escape item also carries a
@@ -535,9 +582,11 @@ enum MenuBuilder {
 
     static func configureShortcutRow(_ item: NSMenuItem, controller: StatusItemController) {
         item.state = controller.approvalShortcutEnabled ? .on : .off
+        let menuPart = controller.menuShortcutEnabled
+            ? " · \(KeyCombo.menu.display) opens this menu" : ""
         item.toolTip = controller.approvalShortcutEnabled
-            ? "\(KeyCombo.allow.display) allow · \(KeyCombo.deny.display) deny the newest pending request — click to configure"
-            : "Off — click to enable and pick the keys"
+            ? "\(KeyCombo.allow.display) allow · \(KeyCombo.deny.display) deny the newest pending request\(menuPart) — click to configure"
+            : "Allow/Deny off\(menuPart) — click to configure"
     }
 
     /// A vanished approval strip: fade the custom views and disarm their buttons

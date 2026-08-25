@@ -13,10 +13,13 @@ struct KeyCombo: Equatable {
                                        carbonModifiers: UInt32(optionKey | cmdKey), display: "⌥⌘A")
     static let defaultDeny = KeyCombo(keyCode: UInt32(kVK_ANSI_D),
                                       carbonModifiers: UInt32(optionKey | cmdKey), display: "⌥⌘D")
+    static let defaultMenu = KeyCombo(keyCode: UInt32(kVK_ANSI_M),
+                                      carbonModifiers: UInt32(optionKey | cmdKey), display: "⌥⌘M")
 
     /// The currently configured combos (defaults when never customized).
     static var allow: KeyCombo { stored("allowHotKey", fallback: .defaultAllow) }
     static var deny: KeyCombo { stored("denyHotKey", fallback: .defaultDeny) }
+    static var menu: KeyCombo { stored("menuHotKey", fallback: .defaultMenu) }
 
     static func stored(_ key: String, fallback: KeyCombo) -> KeyCombo {
         guard let d = UserDefaults.standard.dictionary(forKey: key),
@@ -44,14 +47,12 @@ final class HotKeyCenter {
     private var installed = false
     private var nextID: UInt32 = 1
 
-    /// Turn the Allow/Deny hotkeys on or off with the given combos.
-    func setEnabled(_ enabled: Bool, allow: KeyCombo, deny: KeyCombo,
-                    onAllow: @escaping () -> Void, onDeny: @escaping () -> Void) {
+    /// Replace the registered hotkeys with the given set (empty = all off).
+    func apply(_ bindings: [(combo: KeyCombo, handler: () -> Void)]) {
         unregisterAll()
-        guard enabled else { return }
+        guard !bindings.isEmpty else { return }
         installHandlerIfNeeded()
-        register(combo: allow, handler: onAllow)
-        register(combo: deny, handler: onDeny)
+        for b in bindings { register(combo: b.combo, handler: b.handler) }
     }
 
     /// Release the registrations without forgetting the configuration — used while

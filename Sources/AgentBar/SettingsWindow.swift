@@ -11,8 +11,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
     private var enableBox: NSButton!
+    private var menuBox: NSButton!
     private var allowRecorder: ShortcutRecorder!
     private var denyRecorder: ShortcutRecorder!
+    private var menuRecorder: ShortcutRecorder!
     private var soundsBox: NSButton!
     private var volumeSlider: NSSlider!
     private var testButton: NSButton!
@@ -37,6 +39,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private func cancelCaptures() {
         allowRecorder.cancelCapture()
         denyRecorder.cancelCapture()
+        menuRecorder.cancelCapture()
     }
 
     private func build() {
@@ -73,26 +76,29 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let enableCaption = caption(
             "Answer the newest pending permission request from anywhere,\nwithout opening the menu. No Accessibility permission needed.")
 
+        menuBox = NSButton(checkboxWithTitle: "Global open-menu shortcut",
+                           target: self, action: #selector(toggleMenuEnabled))
+
         allowRecorder = ShortcutRecorder(defaultsKey: "allowHotKey", fallback: .defaultAllow)
         denyRecorder = ShortcutRecorder(defaultsKey: "denyHotKey", fallback: .defaultDeny)
-        for recorder in [allowRecorder!, denyRecorder!] {
+        menuRecorder = ShortcutRecorder(defaultsKey: "menuHotKey", fallback: .defaultMenu)
+        let recorders = [allowRecorder!, denyRecorder!, menuRecorder!]
+        for recorder in recorders {
             recorder.onCaptureChange = { [weak self, weak recorder] capturing in
                 guard let self else { return }
                 if capturing {
                     // One recorder at a time, and while recording the current combo
                     // must reach the recorder, not the Carbon hotkey — suspend,
                     // then re-register on the way out.
-                    let other = recorder === self.allowRecorder ? self.denyRecorder : self.allowRecorder
-                    other?.cancelCapture()
+                    for other in recorders where other !== recorder { other.cancelCapture() }
                     HotKeyCenter.shared.suspend()
                 } else {
                     self.onChange?()
                 }
             }
-            recorder.rejectCombo = { [weak self, weak recorder] combo in
-                // The two actions may not share one combo.
-                let other = recorder === self?.allowRecorder ? self?.denyRecorder : self?.allowRecorder
-                return combo == other?.combo
+            recorder.rejectCombo = { [weak recorder] combo in
+                // No two actions may share one combo.
+                recorders.contains { $0 !== recorder && $0.combo == combo }
             }
             recorder.onRecord = { [weak self] in self?.onChange?() }
         }
@@ -100,6 +106,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let grid = NSGridView(views: [
             [gridLabel("Allow:"), allowRecorder!],
             [gridLabel("Deny:"), denyRecorder!],
+            [gridLabel("Open menu:"), menuRecorder!],
         ])
         grid.rowSpacing = 8
         grid.columnSpacing = 10
@@ -114,7 +121,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let sep1 = separator(), sep2 = separator()
         let stack = NSStackView(views: [
             sectionLabel("Sounds"), soundsBox, soundsCap, volumeRow, sep1,
-            sectionLabel("Shortcuts"), enableBox, enableCaption, grid, sep2,
+            sectionLabel("Shortcuts"), enableBox, enableCaption, menuBox, grid, sep2,
             sectionLabel("Island"), hideIslandBox, islandCaption,
         ])
         stack.orientation = .vertical
@@ -149,8 +156,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     private func reload() {
         enableBox.state = UserDefaults.standard.bool(forKey: "globalApprovalShortcut") ? .on : .off
+        menuBox.state = (UserDefaults.standard.object(forKey: "globalMenuShortcut") as? Bool ?? true)
+            ? .on : .off
         allowRecorder.reload()
         denyRecorder.reload()
+        menuRecorder.reload()
         soundsBox.state = SoundCenter.enabled ? .on : .off
         volumeSlider.doubleValue = SoundCenter.volume
         hideIslandBox.state = UserDefaults.standard.bool(forKey: "hideIslandWhenEmpty") ? .on : .off
@@ -160,6 +170,12 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     @objc private func toggleEnabled() {
         UserDefaults.standard.set(enableBox.state == .on, forKey: "globalApprovalShortcut")
+        syncRecorderState()
+        onChange?()
+    }
+
+    @objc private func toggleMenuEnabled() {
+        UserDefaults.standard.set(menuBox.state == .on, forKey: "globalMenuShortcut")
         syncRecorderState()
         onChange?()
     }
@@ -190,6 +206,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let on = enableBox.state == .on
         allowRecorder.isEnabled = on
         denyRecorder.isEnabled = on
+        menuRecorder.isEnabled = menuBox.state == .on
     }
 
     private func syncSoundControls() {

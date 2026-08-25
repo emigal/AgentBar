@@ -38,20 +38,75 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // Fork: no periodic update checks — this build is maintained by rebasing on
         // upstream and rebuilding locally; a background self-replace would revert it.
         applyHotKeyState()
-        mascot.sink("statusItem") { [weak self] image, word in
-            guard let button = self?.statusItem.button else { return }
-            button.image = image
-            button.title = word.isEmpty ? "" : " \(word)…"
-            if !word.isEmpty { button.imagePosition = .imageLeft }
-        }
+        renderStatusIcon()
         applyPresentation()
     }
 
-    /// A new session snapshot. Drawing the mark is the mascot's job; this only has
-    /// to keep an open dropdown live as state changes.
+    /// A new session snapshot: redraw the mark-and-dots and keep an open
+    /// dropdown live as state changes.
     func apply(_ sessions: [Session]) {
         self.sessions = sessions
         refreshOpenMenu()
+        renderStatusIcon()
+    }
+
+    /// Color mode flipped (menu quick-toggle or the welcome window).
+    func colorModeChanged() {
+        cachedBase = nil
+        renderStatusIcon()
+    }
+
+    // MARK: - Status icon: small Claude mark + one dot per session
+
+    /// Blocked first (the user is the bottleneck), then done, then working —
+    /// capped at 5 dots. The dropdown carries the full list. Idle sessions
+    /// (e.g. suspended cloud threads) rest without a dot.
+    private var statusDots: [IconRenderer.StatusDot] {
+        var dots: [IconRenderer.StatusDot] = []
+        for s in sessions where s.state == .permission || s.state == .question
+            || s.state == .error { dots.append(.blocked) }
+        for s in sessions where s.state == .done { dots.append(.done) }
+        for s in sessions where s.state.isWorking { dots.append(.working) }
+        return Array(dots.prefix(5))
+    }
+
+    private var pulseTimer: Timer?
+    private var pulsePhase = 0.0
+    private var cachedBase: NSImage?
+    private var cachedBaseIsTemplate = false
+
+    private func renderStatusIcon() {
+        // Working dots breathe: ~1.6s cycle, redrawn at 12 fps only while
+        // something is actually working.
+        if statusDots.contains(.working) {
+            if pulseTimer == nil {
+                pulseTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12, repeats: true) {
+                    [weak self] _ in
+                    guard let self else { return }
+                    self.pulsePhase += 1.0 / 12
+                    self.drawStatusIcon()
+                }
+            }
+        } else {
+            pulseTimer?.invalidate()
+            pulseTimer = nil
+            pulsePhase = 0
+        }
+        drawStatusIcon()
+    }
+
+    private func drawStatusIcon() {
+        if cachedBase == nil {
+            let sprite = IconRenderer.shared.sprite(for: Agent.byID("claude"))
+            let resting = IconColor.system ? sprite.restingTemplate : sprite.restingColor
+            cachedBase = IconRenderer.fit(resting, height: 14)
+            cachedBaseIsTemplate = resting.isTemplate
+        }
+        guard let base = cachedBase, let button = statusItem.button else { return }
+        let alpha = 0.35 + 0.65 * (0.5 + 0.5 * sin(pulsePhase * 2 * .pi / 1.6))
+        button.image = IconRenderer.statusIcon(base: base, baseIsTemplate: cachedBaseIsTemplate,
+                                               dots: statusDots, pulse: alpha)
+        button.title = ""
     }
 
     func requestsChanged() { refreshOpenMenu() }
@@ -93,13 +148,31 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         set { UserDefaults.standard.set(newValue, forKey: "globalApprovalShortcut"); applyHotKeyState() }
     }
 
+    /// The open-the-menu shortcut ships on; Settings can rebind or disable it.
+    var menuShortcutEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "globalMenuShortcut") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "globalMenuShortcut"); applyHotKeyState() }
+    }
+
     private var lastHotkey = Date.distantPast
 
     private func applyHotKeyState() {
-        HotKeyCenter.shared.setEnabled(approvalShortcutEnabled,
-            allow: KeyCombo.allow, deny: KeyCombo.deny,
-            onAllow: { [weak self] in self?.hotkeyAnswer("allow") },
-            onDeny:  { [weak self] in self?.hotkeyAnswer("deny") })
+        var bindings: [(combo: KeyCombo, handler: () -> Void)] = []
+        if approvalShortcutEnabled {
+            bindings.append((KeyCombo.allow, { [weak self] in self?.hotkeyAnswer("allow") }))
+            bindings.append((KeyCombo.deny, { [weak self] in self?.hotkeyAnswer("deny") }))
+        }
+        if menuShortcutEnabled {
+            bindings.append((KeyCombo.menu, { [weak self] in self?.openMenuViaHotkey() }))
+        }
+        HotKeyCenter.shared.apply(bindings)
+    }
+
+    /// Pop the dropdown from anywhere. Only when the mark is visible — in
+    /// island-only mode there is no menu to pop.
+    private func openMenuViaHotkey() {
+        guard statusItem.isVisible, let button = statusItem.button else { return }
+        button.performClick(nil)
     }
 
     /// Answer the newest pending PERMISSION request. Debounced so a held chord
@@ -189,6 +262,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return (rows + ["req:"] + pending
                 + ["upd:\(UpdateChecker.shared.status)",
                    "hk:\(approvalShortcutEnabled):\(KeyCombo.allow.display)\(KeyCombo.deny.display)",
+                   "mhk:\(menuShortcutEnabled):\(KeyCombo.menu.display)",
                    "mode:\(systemColor)",
                    "snd:\(SoundCenter.enabled)"]).joined(separator: "\n")
     }

@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         IconColor.onChange = { [weak self] system in
             guard let self else { return }
             self.mascot.update(sessions: self.sessions, systemColor: system)
+            self.controller.colorModeChanged()
         }
         requestStore.onChange = { [weak self] in
             guard let self else { return }
