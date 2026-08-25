@@ -30,6 +30,9 @@ enum TerminalFocus {
         // seconds later — first use waits on the Automation consent prompt.
         AgentActions.focusTerminal(named: term)
         queue.async {
+            // Herdr first: if the session lives in a Herdr pane, selecting it
+            // settles while the (much slower) AppleScript tab select runs.
+            focusHerdrPane(sessionID: session.id)
             var targeted = false
             switch term {
             case "iTerm.app":
@@ -45,6 +48,30 @@ enum TerminalFocus {
             }
             if let done { DispatchQueue.main.async { done(targeted) } }
         }
+    }
+
+    /// Herdr (terminal multiplexer for coding agents): when the session runs in
+    /// a Herdr pane, ask Herdr to select that pane — workspace, tab, and pane —
+    /// inside the terminal the app focus already brought forward. Herdr tracks
+    /// each pane's native agent session id, so the row's own id is the lookup
+    /// key: no protocol or hook changes needed. Best effort like everything
+    /// here: no binary, no server, or no match leaves the app-level focus.
+    private static func focusHerdrPane(sessionID: String) {
+        guard let herdr = [NSHomeDirectory() + "/.local/bin/herdr",
+                           "/opt/homebrew/bin/herdr", "/usr/local/bin/herdr"]
+            .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+        else { return }
+        guard let json = run(herdr, ["agent", "list"]),
+              let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let agents = ((obj["result"] as? [String: Any])?["agents"]
+                            ?? obj["agents"]) as? [[String: Any]],
+              let match = agents.first(where: {
+                  (($0["agent_session"] as? [String: Any])?["value"] as? String) == sessionID
+              }),
+              let pane = match["pane_id"] as? String
+        else { return }
+        _ = run(herdr, ["agent", "focus", pane])
     }
 
     /// "/dev/ttys003" for a live process, nil for daemons ("??") or a dead pid.
