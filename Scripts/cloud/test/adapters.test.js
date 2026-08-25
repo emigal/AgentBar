@@ -76,13 +76,18 @@ test("devin: status_enum mapping — blocked is question, never permission", () 
 });
 
 test("devin: v3 shape — numeric timestamps, unprefixed ids, bare status", () => {
-  const v3 = { items: [{ session_id: "082c8b0459464c6c9ce3ea47da31a0d2", status: "suspended",
-    title: "Sentry errors 24 hours", created_at: String(NOW - 7200), updated_at: String(NOW - 600) }] };
+  const v3 = { items: [
+    { session_id: "082c8b0459464c6c9ce3ea47da31a0d2", status: "suspended",
+      title: "Sentry errors 24 hours", created_at: String(NOW - 7200), updated_at: String(NOW - 600) },
+    { session_id: "f9b766226d0000000000000000000000", status: "running", // v3 for v1's "working"
+      title: "Validate backfill plan", created_at: String(NOW - 120), updated_at: String(NOW - 60) },
+  ] };
   const { rows, warnings } = devin.normalize(v3, DEFAULTS.devin, NOW);
   assert.equal(rows[0].state, "idle");
   assert.equal(rows[0].updated_at, NOW - 600); // numeric-string epoch parsed, not defaulted to now
   assert.equal(rows[0].url, // ACP store keys sessions WITH the devin- prefix
     "devin://acp/session?sessionId=devin-082c8b0459464c6c9ce3ea47da31a0d2&connectorId=devin-cloud");
+  assert.equal(rows[1].state, "thinking"); // a running session is active, never idle-filed
   assert.deepEqual(warnings, []);
 });
 

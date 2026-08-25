@@ -10,7 +10,11 @@ const agentId = "devin";
 const prefix = "cloud-devin-";
 
 const STATES = {
-  working: "thinking",
+  working: "thinking",          // v1 status_enum vocabulary…
+  running: "thinking",          // …and v3's bare status for the same state (observed live)
+  starting: "thinking",
+  pending: "thinking",
+  resuming: "thinking",
   resumed: "thinking",
   resume_requested: "thinking",
   resume_requested_frontend: "thinking",
