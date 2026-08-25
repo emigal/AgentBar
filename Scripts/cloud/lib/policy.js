@@ -21,10 +21,18 @@ const keepRow = (run, cfg, now) => {
 
 const isTerminal = (state) => state === "done" || state === "error";
 
+// States whose ts pins to the vendor's last update instead of "now": terminal
+// runs must age out rather than stay eternally fresh, and a resting (idle,
+// e.g. suspended) run's ts should say when it last actually worked — that is
+// what frontends sort finished rows by, and a frozen row also skips its
+// pointless 30s rewrite. Note the protocol's 24h ts expiry therefore caps how
+// long idle rows can linger, whatever suspendedHours says. Active (thinking /
+// question) rows keep a fresh ts so they can never expire mid-run.
+const tsFrozen = (state) => isTerminal(state) || state === "idle";
+
 // Assemble the state.d row. cwd stays empty (no local checkout — a non-empty cwd
 // would advertise the wrong git branch) and pid is the poller's own, so the rows
-// die with the poller. ts freezes at the vendor's last update once a run is
-// terminal — a done row must age out, not stay eternally fresh.
+// die with the poller.
 const toProtocolRow = (run, { agentId, prefix }, now, pid) => ({
   agent: agentId,
   state: run.state,
@@ -36,7 +44,7 @@ const toProtocolRow = (run, { agentId, prefix }, now, pid) => ({
   term_program: "",
   pid,
   started: true,
-  ts: isTerminal(run.state) ? Math.min(run.updated_at || now, now) : now,
+  ts: tsFrozen(run.state) ? Math.min(run.updated_at || now, now) : now,
   ...(run.started_at ? { started_at: run.started_at } : {}),
   ...(run.prompt ? { prompt: oneLine(run.prompt, 120) } : {}),
   ...(run.recap ? { recap: oneLine(run.recap, 160) } : {}),

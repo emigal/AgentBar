@@ -108,7 +108,7 @@ const cursorFixture = {
   agents: [
     { id: "bc-11111111-2222-3333-4444-555555555555", name: "Fix login bug", status: "ACTIVE",
       latestRunId: "run-1", url: "https://cursor.com/agents/bc-11111111-2222-3333-4444-555555555555",
-      repos: ["github.com/emigal/webapp.git"], createdAt: iso(3600) },
+      repos: ["github.com/acme/webapp.git"], createdAt: iso(3600) },
     { id: "bc-archived", name: "Old", status: "ARCHIVED", latestRunId: "run-9" },
     { id: "bc-errored", name: "Broken run", status: "ACTIVE", latestRunId: "run-2", createdAt: iso(3600) },
   ],
@@ -168,6 +168,9 @@ test("toProtocolRow: cloud invariants — cwd empty, entrypoint cloud, ts frozen
   const finished = toProtocolRow({ id: "s2", state: "done", label: "", project: "P",
     url: "https://x", updated_at: NOW - 500 }, meta, NOW, 4242);
   assert.equal(finished.ts, NOW - 500); // frozen: the row must age out, not stay fresh
+  const suspended = toProtocolRow({ id: "s3", state: "idle", label: "", project: "P",
+    url: "https://x", updated_at: NOW - 900 }, meta, NOW, 4242);
+  assert.equal(suspended.ts, NOW - 900); // frozen too: ts = when it last worked (sort key)
 });
 
 test("safeId: sanitizes and stays unique past 64 chars", () => {

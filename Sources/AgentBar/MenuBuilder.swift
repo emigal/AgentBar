@@ -6,10 +6,16 @@ enum MenuBuilder {
                          controller: StatusItemController) {
         menu.removeAllItems()
 
-        // Sessions: live work top-level; finished and idle rows fold into one
-        // expandable so a busy day doesn't scroll the menu.
+        // Sessions: live work top-level, newest-started first — the session you
+        // just kicked off is the one you're most likely reaching for. The Idle
+        // section sorts by ts, which for a resting row is when it last actually
+        // worked (local hooks stop writing at the finish; the cloud poller pins
+        // ts to the vendor's last update) — so: most recently finished first.
         let resting = sessions.filter { $0.state == .done || $0.state == .idle }
+            .sorted { $0.ts > $1.ts }
         let active = sessions.filter { !($0.state == .done || $0.state == .idle) }
+            .sorted { ($0.startedAt > 0 ? $0.startedAt : $0.ts)
+                    > ($1.startedAt > 0 ? $1.startedAt : $1.ts) }
         menu.addItem(header("Sessions"))
         if sessions.isEmpty {
             let none = NSMenuItem(title: "No active sessions", action: nil, keyEquivalent: "")
