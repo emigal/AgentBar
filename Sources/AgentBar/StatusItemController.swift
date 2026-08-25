@@ -263,6 +263,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
                 + ["upd:\(UpdateChecker.shared.status)",
                    "hk:\(approvalShortcutEnabled):\(KeyCombo.allow.display)\(KeyCombo.deny.display)",
                    "mhk:\(menuShortcutEnabled):\(KeyCombo.menu.display)",
+                   "idle:\(UserDefaults.standard.bool(forKey: "idleExpanded"))",
                    "mode:\(systemColor)",
                    "snd:\(SoundCenter.enabled)"]).joined(separator: "\n")
     }
@@ -272,6 +273,17 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc func sessionRowClicked(_ sender: NSMenuItem) {
         guard let s = sender.representedObject as? Session else { return }
         AgentActions.focus(s, requests: requestStore.requests)
+    }
+
+    /// The inline Idle group toggle. Selecting any NSMenuItem closes the menu,
+    /// so flip the state and re-open — the rebuilt menu comes back with the idle
+    /// rows shown (or folded) in the main list, arrow-navigable.
+    @objc func toggleIdleClicked(_ sender: NSMenuItem) {
+        let d = UserDefaults.standard
+        d.set(!d.bool(forKey: "idleExpanded"), forKey: "idleExpanded")
+        DispatchQueue.main.async { [weak self] in
+            self?.statusItem.button?.performClick(nil)
+        }
     }
 
     @objc func openAgentClicked(_ sender: NSMenuItem) {

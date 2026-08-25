@@ -56,24 +56,33 @@ enum MenuBuilder {
                 menu.addItem(item)
             }
             if !resting.isEmpty {
-                let parent = NSMenuItem(title: "Idle (\(resting.count))", action: nil,
+                // Inline expandable, not a submenu: the rows join the main list so
+                // arrow keys walk straight through them. The toggle re-opens the
+                // menu (an NSMenuItem click always closes it) with the state flipped.
+                let expanded = UserDefaults.standard.bool(forKey: "idleExpanded")
+                let parent = NSMenuItem(title: "Idle (\(resting.count))",
+                                        action: #selector(StatusItemController.toggleIdleClicked(_:)),
                                         keyEquivalent: "")
                 parent.identifier = NSUserInterfaceItemIdentifier("idleParent")
-                parent.image = NSImage(systemSymbolName: "moon.zzz", accessibilityDescription: nil)
-                let sub = NSMenu()
-                sub.delegate = controller // report open/close so live refresh holds off
-                for s in resting {
-                    let item = NSMenuItem(title: "",
-                                          action: #selector(StatusItemController.sessionRowClicked(_:)),
-                                          keyEquivalent: "")
-                    item.target = controller
-                    item.representedObject = s
-                    item.attributedTitle = rowTitle(s)
-                    item.toolTip = rowToolTip(s)
-                    sub.addItem(item)
-                }
-                parent.submenu = sub
+                parent.target = controller
+                parent.image = NSImage(systemSymbolName: expanded ? "chevron.down" : "chevron.right",
+                                       accessibilityDescription: expanded ? "collapse" : "expand")
+                parent.toolTip = expanded ? "Hide finished and idle sessions"
+                                          : "Show finished and idle sessions"
                 menu.addItem(parent)
+                if expanded {
+                    for s in resting {
+                        let item = NSMenuItem(title: "",
+                                              action: #selector(StatusItemController.sessionRowClicked(_:)),
+                                              keyEquivalent: "")
+                        item.target = controller
+                        item.representedObject = s
+                        item.indentationLevel = 1 // also marks the row as idle for updateInPlace
+                        item.attributedTitle = rowTitle(s)
+                        item.toolTip = rowToolTip(s)
+                        menu.addItem(item)
+                    }
+                }
             }
         }
 
@@ -506,40 +515,28 @@ enum MenuBuilder {
 
     static func updateInPlace(_ menu: NSMenu, sessions: [Session], requests: [ApprovalRequest],
                               controller: StatusItemController) -> Bool {
-        var displayedTop = Set<String>()
+        var displayedActive = Set<String>()
         var displayedIdle = Set<String>()
         var displayedRequests = Set<String>()
-        var idleSub: NSMenu?
         for item in menu.items {
             if let tag = requestTag(item) { displayedRequests.insert(tag); continue }
-            if let s = item.representedObject as? Session { displayedTop.insert(s.id) }
-            if item.identifier?.rawValue == "idleParent", let sub = item.submenu {
-                idleSub = sub
-                for it in sub.items where it.representedObject is Session {
-                    displayedIdle.insert((it.representedObject as! Session).id)
-                }
-            }
+            guard let s = item.representedObject as? Session else { continue }
+            // indentationLevel 1 = an expanded idle row (set by populate).
+            if item.indentationLevel == 1 { displayedIdle.insert(s.id) }
+            else { displayedActive.insert(s.id) }
         }
         // A session that crossed between live work and the Idle group is a
-        // structure change — only a rebuild can move its row.
+        // structure change — only a rebuild can move its row. While the group is
+        // collapsed its sessions have no rows, which also (correctly) forces the
+        // rebuild path whenever their content changes.
         let restingIDs = Set(sessions.filter { $0.state == .done || $0.state == .idle }.map(\.id))
         let activeIDs = Set(sessions.map(\.id)).subtracting(restingIDs)
-        guard activeIDs.isSubset(of: displayedTop),
-              restingIDs.isSubset(of: displayedIdle),
+        let idleHidden = !UserDefaults.standard.bool(forKey: "idleExpanded") && displayedIdle.isEmpty
+        guard activeIDs.isSubset(of: displayedActive),
+              idleHidden ? restingIDs.isEmpty : restingIDs.isSubset(of: displayedIdle),
               Set(requests.map(\.fileName)).isSubset(of: displayedRequests) else { return false }
 
         let live = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-        // Idle rows are plain: title, tooltip, payload — no strips, no submenus.
-        for item in idleSub?.items ?? [] {
-            guard let s = item.representedObject as? Session else { continue }
-            if let updated = live[s.id] {
-                item.representedObject = updated
-                item.attributedTitle = rowTitle(updated)
-                item.toolTip = rowToolTip(updated)
-            } else {
-                item.attributedTitle = endedRowTitle(s)
-            }
-        }
         let liveRequests = Set(requests.map(\.fileName))
         for item in menu.items {
             // Request-tagged rows first: a question's escape item also carries a
