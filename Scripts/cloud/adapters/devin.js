@@ -47,9 +47,20 @@ const normalize = (raw, cfg, now) => {
       warnings.push(`unknown devin status "${key}"`);
       state = "idle";
     }
-    if (state === "suspended") state = cfg.showSuspended ? "idle" : null;
+    // Devin auto-suspends resting threads, so suspended IS the common state of a
+    // recently-worked session — shown (as idle) within its own shorter window.
+    let recentHours = cfg.recentHours;
+    if (state === "suspended") {
+      state = cfg.showSuspended ? "idle" : null;
+      recentHours = cfg.suspendedHours;
+    }
     const id = String(s.session_id || s.id || "");
     if (!id) continue;
+    // v1 ids carry a "devin-" prefix, v3 ids don't. The IDE's ACP store keys
+    // sessions WITH the prefix; the web app addresses them WITHOUT it (the
+    // IDE's own handler strips it for its web fallback).
+    const acpId = id.startsWith("devin-") ? id : `devin-${id}`;
+    const webId = id.startsWith("devin-") ? id.slice("devin-".length) : id;
     rows.push({
       id,
       state,
@@ -62,11 +73,11 @@ const normalize = (raw, cfg, now) => {
       // Agent Command Center activates in-app, and the handler itself falls back
       // to the web thread URL when it isn't. "web" skips the app entirely.
       url: cfg.openIn === "web"
-        ? s.url || `https://app.devin.ai/sessions/${encodeURIComponent(id)}`
-        : `devin://acp/session?sessionId=${encodeURIComponent(id)}&connectorId=devin-cloud`,
+        ? s.url || `https://app.devin.ai/sessions/${encodeURIComponent(webId)}`
+        : `devin://acp/session?sessionId=${encodeURIComponent(acpId)}&connectorId=devin-cloud`,
       started_at: epoch(s.created_at) || 0,
       updated_at: epoch(s.updated_at) || now,
-      recentHours: cfg.recentHours,
+      recentHours,
     });
   }
   return { rows, warnings };

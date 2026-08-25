@@ -50,7 +50,9 @@ const pollVendor = async (v) => {
   for (const w of warnings) if (!v.warned.has(w)) { v.warned.add(w); log(`${v.adapter.vendor}: ${w}`); }
 
   const t = now();
-  const kept = rows.filter((r) => keepRow({ ...r, recentHours: cfg.recentHours }, v.global, t));
+  // Vendor default first, so an adapter's per-row recentHours (e.g. Devin's
+  // shorter suspended window) survives the merge.
+  const kept = rows.filter((r) => keepRow({ recentHours: cfg.recentHours, ...r }, v.global, t));
   const written = [];
   for (const r of kept) {
     const row = toProtocolRow(r, v.adapter, t, process.pid);

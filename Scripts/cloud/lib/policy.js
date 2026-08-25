@@ -43,9 +43,16 @@ const toProtocolRow = (run, { agentId, prefix }, now, pid) => ({
   url: String(run.url || ""),
 });
 
-// ISO timestamp -> unix seconds; 0 when unparseable (callers treat 0 as unknown).
-const epoch = (iso) => {
-  const ms = Date.parse(iso || "");
+// Timestamp -> unix seconds; 0 when unparseable (callers treat 0 as unknown).
+// Accepts ISO strings (Cursor, Devin v1) and numeric seconds or milliseconds,
+// as numbers or strings (Devin v3 returns "1787641783").
+const epoch = (t) => {
+  if (t == null || t === "") return 0;
+  const n = Number(t);
+  if (Number.isFinite(n) && /^\s*\d+(\.\d+)?\s*$/.test(String(t))) {
+    return Math.floor(n > 1e12 ? n / 1000 : n);
+  }
+  const ms = Date.parse(t);
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : 0;
 };
 

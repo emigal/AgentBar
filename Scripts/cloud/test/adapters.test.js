@@ -67,22 +67,34 @@ test("devin: status_enum mapping — blocked is question, never permission", () 
   assert.equal(byId["devin-blocked1"].state, "question");
   assert.equal(byId["devin-fin"].state, "done");
   assert.equal(byId["devin-fin"].recap, "https://github.com/x/y/pull/7");
-  assert.equal(byId["devin-susp"].state, null); // hidden: showSuspended defaults false
-  assert.equal(byId["devin-old"].state, null);  // expired: dropped
+  assert.equal(byId["devin-susp"].state, "idle"); // suspended = Devin's resting state, shown
+  assert.equal(byId["devin-susp"].recentHours, DEFAULTS.devin.suspendedHours);
+  assert.equal(byId["devin-old"].state, null);    // expired: dropped
   assert.equal(byId["devin-abc123"].url, // default: exact thread in Devin Desktop
     "devin://acp/session?sessionId=devin-abc123&connectorId=devin-cloud");
   assert.deepEqual(warnings, []);
 });
 
-test("devin: openIn web yields the thread-precise browser URL", () => {
-  const { rows } = devin.normalize(devinFixture, { ...DEFAULTS.devin, openIn: "web" }, NOW);
-  assert.equal(rows.find((r) => r.id === "devin-abc123").url,
-    "https://app.devin.ai/sessions/devin-abc123");
+test("devin: v3 shape — numeric timestamps, unprefixed ids, bare status", () => {
+  const v3 = { items: [{ session_id: "082c8b0459464c6c9ce3ea47da31a0d2", status: "suspended",
+    title: "Sentry errors 24 hours", created_at: String(NOW - 7200), updated_at: String(NOW - 600) }] };
+  const { rows, warnings } = devin.normalize(v3, DEFAULTS.devin, NOW);
+  assert.equal(rows[0].state, "idle");
+  assert.equal(rows[0].updated_at, NOW - 600); // numeric-string epoch parsed, not defaulted to now
+  assert.equal(rows[0].url, // ACP store keys sessions WITH the devin- prefix
+    "devin://acp/session?sessionId=devin-082c8b0459464c6c9ce3ea47da31a0d2&connectorId=devin-cloud");
+  assert.deepEqual(warnings, []);
 });
 
-test("devin: showSuspended surfaces suspended sessions as idle", () => {
-  const { rows } = devin.normalize(devinFixture, { ...DEFAULTS.devin, showSuspended: true }, NOW);
-  assert.equal(rows.find((r) => r.id === "devin-susp").state, "idle");
+test("devin: openIn web yields the thread-precise browser URL, prefix stripped", () => {
+  const { rows } = devin.normalize(devinFixture, { ...DEFAULTS.devin, openIn: "web" }, NOW);
+  assert.equal(rows.find((r) => r.id === "devin-abc123").url,
+    "https://app.devin.ai/sessions/abc123");
+});
+
+test("devin: showSuspended false hides suspended sessions", () => {
+  const { rows } = devin.normalize(devinFixture, { ...DEFAULTS.devin, showSuspended: false }, NOW);
+  assert.equal(rows.find((r) => r.id === "devin-susp").state, null);
 });
 
 // --- cursor (v1 doc shape: lifecycle on the agent, live status on the run)
@@ -163,8 +175,11 @@ test("safeId: sanitizes and stays unique past 64 chars", () => {
   assert.notEqual(a, b); // head-only truncation would collide
 });
 
-test("epoch: ISO in, unix seconds out; garbage in, 0 out", () => {
+test("epoch: ISO, numeric seconds, numeric ms; garbage in, 0 out", () => {
   assert.equal(epoch("2026-08-24T10:00:00.000Z"), 1787565600);
+  assert.equal(epoch("1787641783"), 1787641783);      // Devin v3: seconds as string
+  assert.equal(epoch(1787641783), 1787641783);
+  assert.equal(epoch(1787641783199), 1787641783);     // milliseconds collapse to seconds
   assert.equal(epoch("nope"), 0);
   assert.equal(epoch(undefined), 0);
 });
