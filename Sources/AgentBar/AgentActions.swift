@@ -9,6 +9,11 @@ enum AgentActions {
     /// need a view of it without owning a store.
     static var currentSessions: () -> [Session] = { [] }
 
+    /// Fired when the user jumps to a session (menu row, island row — any
+    /// surface). The status item listens to stop dotting finishes the user has
+    /// already looked at.
+    static var sessionOpened: (Session) -> Void = { _ in }
+
     static func open(_ agent: Agent) {
         let ws = NSWorkspace.shared
         switch agent.open {
@@ -52,6 +57,7 @@ enum AgentActions {
     /// with the hook still blocked. (A question's wizard is already on screen, but
     /// deferring still retires the island card — answered where the user is going.)
     static func focus(_ s: Session, requests: [ApprovalRequest]) {
+        sessionOpened(s)
         // A cloud session lives at a URL, not in anything local: open it and stop —
         // there is no tty to resolve and no blocked hook to release. Checked first
         // so no local-only path can ever run for a row the poller wrote.

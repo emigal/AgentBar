@@ -46,6 +46,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// dropdown live as state changes.
     func apply(_ sessions: [Session]) {
         self.sessions = sessions
+        openedFinished = openedFinished.filter { id in
+            sessions.contains { $0.id == id && ($0.state == .done || $0.state == .error) }
+        }
         refreshOpenMenu()
         renderStatusIcon()
     }
@@ -60,14 +63,29 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     /// Blocked first (the user is the bottleneck), then done, then working —
     /// capped at 5 dots. The dropdown carries the full list. Idle sessions
-    /// (e.g. suspended cloud threads) rest without a dot.
+    /// (e.g. suspended cloud threads) rest without a dot, and so does a finish
+    /// (or failure) the user has already jumped to: a dot is a thing to look
+    /// at, not a state.
     private var statusDots: [IconRenderer.StatusDot] {
         var dots: [IconRenderer.StatusDot] = []
         for s in sessions where s.state == .permission || s.state == .question
-            || s.state == .error { dots.append(.blocked) }
-        for s in sessions where s.state == .done { dots.append(.done) }
+            || (s.state == .error && !openedFinished.contains(s.id)) { dots.append(.blocked) }
+        for s in sessions where s.state == .done && !openedFinished.contains(s.id) {
+            dots.append(.done)
+        }
         for s in sessions where s.state.isWorking { dots.append(.working) }
         return Array(dots.prefix(5))
+    }
+
+    /// Session ids whose done/error state the user has opened. Membership only
+    /// means "this finish was seen": the moment a session works again its id is
+    /// pruned (in `apply`), so the next finish earns a fresh dot.
+    private var openedFinished: Set<String> = []
+
+    func markOpened(_ s: Session) {
+        guard s.state == .done || s.state == .error else { return }
+        openedFinished.insert(s.id)
+        renderStatusIcon()
     }
 
     private var pulseTimer: Timer?

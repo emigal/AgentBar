@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AgentActions.currentSessions = { [weak self] in self?.sessions ?? [] }
+        AgentActions.sessionOpened = { [weak self] s in self?.controller.markOpened(s) }
 
         store.onChange = { [weak self] sessions in
             guard let self else { return }
