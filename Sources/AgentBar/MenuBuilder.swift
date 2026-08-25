@@ -56,32 +56,19 @@ enum MenuBuilder {
                 menu.addItem(item)
             }
             if !resting.isEmpty {
-                // Inline expandable, not a submenu: the rows join the main list so
-                // arrow keys walk straight through them. The toggle re-opens the
-                // menu (an NSMenuItem click always closes it) with the state flipped.
-                let expanded = UserDefaults.standard.bool(forKey: "idleExpanded")
-                let parent = NSMenuItem(title: "Idle (\(resting.count))",
-                                        action: #selector(StatusItemController.toggleIdleClicked(_:)),
-                                        keyEquivalent: "")
-                parent.identifier = NSUserInterfaceItemIdentifier("idleParent")
-                parent.target = controller
-                parent.image = NSImage(systemSymbolName: expanded ? "chevron.down" : "chevron.right",
-                                       accessibilityDescription: expanded ? "collapse" : "expand")
-                parent.toolTip = expanded ? "Hide finished and idle sessions"
-                                          : "Show finished and idle sessions"
-                menu.addItem(parent)
-                if expanded {
-                    for s in resting {
-                        let item = NSMenuItem(title: "",
-                                              action: #selector(StatusItemController.sessionRowClicked(_:)),
-                                              keyEquivalent: "")
-                        item.target = controller
-                        item.representedObject = s
-                        item.indentationLevel = 1 // also marks the row as idle for updateInPlace
-                        item.attributedTitle = rowTitle(s)
-                        item.toolTip = rowToolTip(s)
-                        menu.addItem(item)
-                    }
+                // Finished and idle sessions sit under their own header, listed
+                // plainly in the main menu — one flat, arrow-navigable list.
+                menu.addItem(header("Idle"))
+                for s in resting {
+                    let item = NSMenuItem(title: "",
+                                          action: #selector(StatusItemController.sessionRowClicked(_:)),
+                                          keyEquivalent: "")
+                    item.identifier = NSUserInterfaceItemIdentifier("idleRow")
+                    item.target = controller
+                    item.representedObject = s
+                    item.attributedTitle = rowTitle(s)
+                    item.toolTip = rowToolTip(s)
+                    menu.addItem(item)
                 }
             }
         }
@@ -521,19 +508,15 @@ enum MenuBuilder {
         for item in menu.items {
             if let tag = requestTag(item) { displayedRequests.insert(tag); continue }
             guard let s = item.representedObject as? Session else { continue }
-            // indentationLevel 1 = an expanded idle row (set by populate).
-            if item.indentationLevel == 1 { displayedIdle.insert(s.id) }
+            if item.identifier?.rawValue == "idleRow" { displayedIdle.insert(s.id) }
             else { displayedActive.insert(s.id) }
         }
-        // A session that crossed between live work and the Idle group is a
-        // structure change — only a rebuild can move its row. While the group is
-        // collapsed its sessions have no rows, which also (correctly) forces the
-        // rebuild path whenever their content changes.
+        // A session that crossed between live work and the Idle section is a
+        // structure change — only a rebuild can move its row.
         let restingIDs = Set(sessions.filter { $0.state == .done || $0.state == .idle }.map(\.id))
         let activeIDs = Set(sessions.map(\.id)).subtracting(restingIDs)
-        let idleHidden = !UserDefaults.standard.bool(forKey: "idleExpanded") && displayedIdle.isEmpty
         guard activeIDs.isSubset(of: displayedActive),
-              idleHidden ? restingIDs.isEmpty : restingIDs.isSubset(of: displayedIdle),
+              restingIDs.isSubset(of: displayedIdle),
               Set(requests.map(\.fileName)).isSubset(of: displayedRequests) else { return false }
 
         let live = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
