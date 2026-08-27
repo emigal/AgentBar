@@ -6,6 +6,7 @@ const assert = require("node:assert");
 const cursor = require("../adapters/cursor");
 const devin = require("../adapters/devin");
 const codex = require("../adapters/codex");
+const herdr = require("../adapters/herdr");
 const { keepRow, toProtocolRow, epoch } = require("../lib/policy");
 const { safeId } = require("../lib/state");
 const { DEFAULTS } = require("../lib/config");
@@ -140,6 +141,72 @@ test("cursor: v0 shape (status on the agent, no runs) still normalizes", () => {
   const v0 = { agents: [{ id: "bc-v0", name: "Old style", status: "FINISHED", createdAt: iso(120) }], runs: {} };
   const { rows } = cursor.normalize(v0, DEFAULTS.cursor, NOW);
   assert.equal(rows[0].state, "done");
+});
+
+// --- herdr: fixture captured from a real `ssh dexter herdr agent list` (2026-08-27)
+
+const herdrFixture = {
+  hosts: [{
+    host: "dexter",
+    agents: [
+      { agent: "claude", agent_status: "working", cwd: "/home/emi/code/frontierfi",
+        pane_id: "w1:pC", state_change_seq: 69, terminal_id: "term_6598124a35ac4c",
+        terminal_title_stripped: "Fix auth flow" },
+      { agent: "prime-agent", agent_status: "blocked", cwd: "/home/emi/code/frontierfi",
+        pane_id: "w1:p9", state_change_seq: 8, terminal_id: "term_658f0e39411ae9",
+        terminal_title_stripped: "prime-agent - frontierfi" },
+      { agent: "claude", agent_status: "idle", cwd: "/home/emi/.local/state/herdr-mirror/.mirror-pane",
+        pane_id: "w1:pF", state_change_seq: 2, terminal_id: "term_reverse" },
+      { agent: "claude", agent_status: "someday", cwd: "/home/emi/x",
+        pane_id: "w1:pG", state_change_seq: 1, terminal_id: "term_weird" },
+    ],
+    panes: {
+      "w1:pC": { localId: "w13:pE", seq: 4636 },
+      "w1:p9": { localId: "w13:pA", tombstone: true, seq: 6 },
+    },
+  }],
+};
+
+test("herdr: states map, mirror panes resolve, remote mirrors and unknowns drop", () => {
+  const cache = new Map();
+  const { rows, warnings } = herdr.normalize(herdrFixture, DEFAULTS.herdr, NOW, cache);
+  assert.equal(rows.length, 2); // reverse mirror pane and unknown status are out
+  assert.equal(rows[0].state, "thinking");
+  assert.equal(rows[0].agent, "claude");
+  assert.equal(rows[0].project, "frontierfi@dexter");
+  assert.equal(rows[0].prompt, "Fix auth flow");
+  assert.equal(rows[0].herdr_pane, "w13:pE"); // live mirror: click focuses it
+  assert.equal(rows[0].herdr_remote_pane, "w1:pC");
+  assert.equal(rows[1].state, "permission"); // blocked = waiting on a human
+  assert.equal(rows[1].agent, "prime-agent");
+  assert.equal(rows[1].herdr_pane, ""); // tombstoned mirror: click restores it
+  assert.equal(rows[1].herdr_host, "dexter");
+  assert.deepEqual(warnings, ['unknown herdr status "someday"']);
+});
+
+test("herdr: state_change_seq is the clock — unchanged keeps updated_at, moved resets it", () => {
+  const cache = new Map();
+  const first = herdr.normalize(herdrFixture, DEFAULTS.herdr, NOW, cache);
+  assert.equal(first.rows[0].updated_at, NOW);
+  const later = herdr.normalize(herdrFixture, DEFAULTS.herdr, NOW + 300, cache);
+  assert.equal(later.rows[0].updated_at, NOW);       // same seq: still the old change time
+  assert.equal(later.rows[0].started_at, NOW);       // first sight sticks
+  const moved = JSON.parse(JSON.stringify(herdrFixture));
+  moved.hosts[0].agents[0].state_change_seq = 70;
+  const changed = herdr.normalize(moved, DEFAULTS.herdr, NOW + 600, cache);
+  assert.equal(changed.rows[0].updated_at, NOW + 600);
+});
+
+test("herdr: rows land in a local pane, not at a url — entrypoint stays overridden", () => {
+  const cache = new Map();
+  const { rows } = herdr.normalize(herdrFixture, DEFAULTS.herdr, NOW, cache);
+  const row = toProtocolRow(rows[0], herdr, NOW, 4242);
+  assert.equal(row.entrypoint, ""); // "" must survive the "cloud" default
+  assert.equal(row.agent, "claude"); // per-row agent wins over the adapter's
+  assert.equal(row.term_program, "Ghostty");
+  assert.equal(row.herdr_pane, "w13:pE");
+  assert.equal(row.herdr_host, "dexter");
+  assert.equal(row.sessionId, "herdr-dexter-term_6598124a35ac4c");
 });
 
 // --- retention / policy

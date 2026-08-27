@@ -32,22 +32,27 @@ const tsFrozen = (state) => isTerminal(state) || state === "idle";
 
 // Assemble the state.d row. cwd stays empty (no local checkout — a non-empty cwd
 // would advertise the wrong git branch) and pid is the poller's own, so the rows
-// die with the poller.
+// die with the poller. A run may override the adapter-level agent id and the
+// "cloud" entrypoint: herdr rows carry their real agent and live in a local
+// mirror pane (entrypoint "", herdr_* pointing the frontend at it), not at a URL.
 const toProtocolRow = (run, { agentId, prefix }, now, pid) => ({
-  agent: agentId,
+  agent: run.agent || agentId,
   state: run.state,
   label: oneLine(run.label, 80),
   project: oneLine(run.project, 40),
   cwd: "",
   sessionId: safeId(prefix + run.id),
-  entrypoint: "cloud",
-  term_program: "",
+  entrypoint: run.entrypoint ?? "cloud",
+  term_program: run.term_program || "",
   pid,
   started: true,
   ts: tsFrozen(run.state) ? Math.min(run.updated_at || now, now) : now,
   ...(run.started_at ? { started_at: run.started_at } : {}),
   ...(run.prompt ? { prompt: oneLine(run.prompt, 120) } : {}),
   ...(run.recap ? { recap: oneLine(run.recap, 160) } : {}),
+  ...(run.herdr_pane ? { herdr_pane: run.herdr_pane } : {}),
+  ...(run.herdr_host ? { herdr_host: run.herdr_host,
+                         herdr_remote_pane: run.herdr_remote_pane || "" } : {}),
   url: String(run.url || ""),
 });
 

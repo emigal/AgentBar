@@ -32,7 +32,7 @@ enum TerminalFocus {
         queue.async {
             // Herdr first: if the session lives in a Herdr pane, selecting it
             // settles while the (much slower) AppleScript tab select runs.
-            focusHerdrPane(sessionID: session.id)
+            focusHerdrPane(session: session)
             var targeted = false
             switch term {
             case "iTerm.app":
@@ -52,26 +52,78 @@ enum TerminalFocus {
 
     /// Herdr (terminal multiplexer for coding agents): when the session runs in
     /// a Herdr pane, ask Herdr to select that pane — workspace, tab, and pane —
-    /// inside the terminal the app focus already brought forward. Herdr tracks
-    /// each pane's native agent session id, so the row's own id is the lookup
-    /// key: no protocol or hook changes needed. Best effort like everything
-    /// here: no binary, no server, or no match leaves the app-level focus.
-    private static func focusHerdrPane(sessionID: String) {
+    /// inside the terminal the app focus already brought forward. Best effort
+    /// like everything here: no binary, no server, or no match leaves the
+    /// app-level focus. Three ways to find the pane, most direct first:
+    /// 1. the row names its local pane (`herdr_pane`, written by the cloud
+    ///    poller's herdr adapter for live herdr-mirror panes);
+    /// 2. the row names a remote pane whose mirror is closed — restore exactly
+    ///    that mirror (`herdr-mirror restore <host> <pane>`) and focus it once
+    ///    the mirror's map file names its fresh local pane;
+    /// 3. a local session: Herdr tracks each pane's native agent session id,
+    ///    so the row's own id is the lookup key — no protocol fields needed.
+    private static func focusHerdrPane(session: Session) {
         guard let herdr = [NSHomeDirectory() + "/.local/bin/herdr",
                            "/opt/homebrew/bin/herdr", "/usr/local/bin/herdr"]
             .first(where: { FileManager.default.isExecutableFile(atPath: $0) })
         else { return }
+        if !session.herdrPane.isEmpty {
+            focusPane(session.herdrPane, herdr: herdr)
+            return
+        }
+        if !session.herdrHost.isEmpty && !session.herdrRemotePane.isEmpty {
+            let mirror = NSHomeDirectory() + "/.local/bin/herdr-mirror"
+            guard FileManager.default.isExecutableFile(atPath: mirror) else { return }
+            _ = run(mirror, ["restore", session.herdrHost, session.herdrRemotePane])
+            // The daemon re-mirrors on SIGUSR1; give the map a few seconds to
+            // name the recreated pane. A miss leaves the app-level focus.
+            for _ in 0..<10 {
+                if let pane = mirrorLocalPane(host: session.herdrHost,
+                                              remotePane: session.herdrRemotePane) {
+                    focusPane(pane, herdr: herdr)
+                    return
+                }
+                usleep(500_000)
+            }
+            return
+        }
         guard let json = run(herdr, ["agent", "list"]),
               let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let agents = ((obj["result"] as? [String: Any])?["agents"]
                             ?? obj["agents"]) as? [[String: Any]],
               let match = agents.first(where: {
-                  (($0["agent_session"] as? [String: Any])?["value"] as? String) == sessionID
+                  (($0["agent_session"] as? [String: Any])?["value"] as? String) == session.id
               }),
               let pane = match["pane_id"] as? String
         else { return }
         _ = run(herdr, ["agent", "focus", pane])
+    }
+
+    /// `agent focus` needs Herdr to have recognized an agent on the pane, which
+    /// lags a freshly restored mirror — fall back to focusing the pane's tab.
+    private static func focusPane(_ pane: String, herdr: String) {
+        if run(herdr, ["agent", "focus", pane]) != nil { return }
+        guard let json = run(herdr, ["pane", "get", pane]),
+              let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tab = ((obj["result"] as? [String: Any])?["pane"]
+                          as? [String: Any])?["tab_id"] as? String
+        else { return }
+        _ = run(herdr, ["tab", "focus", tab])
+    }
+
+    /// herdr-mirror's map file: the live local pane mirroring `remotePane` on
+    /// `host`, nil while none exists (closed mirror, daemon still syncing).
+    private static func mirrorLocalPane(host: String, remotePane: String) -> String? {
+        let path = NSHomeDirectory() + "/.local/state/herdr-mirror/\(host)-map.json"
+        guard let data = FileManager.default.contents(atPath: path),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entry = (obj["panes"] as? [String: Any])?[remotePane] as? [String: Any],
+              (entry["tombstone"] as? Bool) != true,
+              let local = entry["localId"] as? String
+        else { return nil }
+        return local
     }
 
     /// "/dev/ttys003" for a live process, nil for daemons ("??") or a dead pid.

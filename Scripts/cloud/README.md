@@ -1,10 +1,19 @@
 # agentbar-cloud
 
-External poller that mirrors **cloud** coding-agent runs into the AgentBar menu
-bar: Cursor cloud agents, Devin sessions, and Codex cloud tasks become protocol
-rows in `~/.agentbar/state.d/` (`entrypoint: "cloud"`, a `url`, this poller's
-pid). Clicking a row opens the run where it lives — cursor.com / app.devin.ai /
-chatgpt.com. No changes to the app beyond the protocol's optional `url` field.
+External poller that mirrors **non-local** coding-agent runs into the AgentBar
+menu bar: Cursor cloud agents, Devin sessions, and Codex cloud tasks become
+protocol rows in `~/.agentbar/state.d/` (`entrypoint: "cloud"`, a `url`, this
+poller's pid). Clicking a row opens the run where it lives — cursor.com /
+app.devin.ai / chatgpt.com. No changes to the app beyond the protocol's
+optional `url` field.
+
+A fourth adapter covers **remote Herdr machines**: `ssh <host> herdr agent
+list` surfaces every agent Herdr recognizes there (no AgentBar hooks needed on
+the remote). Those rows aren't cloud rows — they point at the local
+herdr-mirror pane mirroring the remote session (`herdr_pane`), so a click
+lands on the live pane in your local Herdr; if that mirror was closed, the
+click restores exactly it (`herdr-mirror restore <host> <pane>`) and then
+focuses it.
 
 ## Setup
 
@@ -27,7 +36,11 @@ Config `~/.agentbar/cloud.json` (chmod 600 — it holds API keys):
               "openIn": "app",                 // focuses Devin Desktop (no per-session deep link
                                                // exists); "web" = app.devin.ai/sessions/<id>, thread-precise
               "recentHours": 48, "showSuspended": false },
-  "codex":  { "enabled": true }                // rides `codex login`, no key needed
+  "codex":  { "enabled": true },               // rides `codex login`, no key needed
+  "herdr":  { "enabled": true,
+              "hosts": ["dexter"],             // ssh targets; each must also be the
+                                               // herdr-mirror host name (hosts.toml)
+              "termProgram": "Ghostty" }       // terminal hosting your local Herdr
 }
 ```
 
@@ -36,7 +49,9 @@ environment instead of the file.
 
 ## Behavior
 
-- Poll every 30 s (codex 60 s — it shells out to `codex cloud list --json`).
+- Poll every 30 s (codex 60 s — it shells out to `codex cloud list --json`;
+  herdr 20 s — one `ssh <host> herdr agent list` per host, key auth required:
+  `ssh -o BatchMode=yes <host> true` must succeed).
 - After each **successful** vendor poll the vendor's rows are reconciled to the
   fresh set; a vendor that keeps failing (~5 min) gets its rows replaced by one
   clickable error row. Vendors never affect each other's rows.

@@ -28,6 +28,9 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
 ```json
 {
   "agent": "claude",           // agent id: claude | codex | copilot | antigravity | cursor | gemini | qwen | opencode | devin
+                               // (writers may report other ids — e.g. kinds a remote
+                               // Herdr recognizes; frontends MUST fall back to a
+                               // default rendering rather than reject the row)
   "state": "tool",             // idle | thinking | tool | permission | question | done | error
   "label": "Running command",  // short human hint for the current state ("" ok)
   "project": "AgentBar",       // basename of cwd ("" ok)
@@ -46,10 +49,17 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
   "model": "claude-opus-5",    // OPTIONAL: model name, when the agent reports one
   "recap": "Fixed the auth bug and added 3 regression tests",
                                // OPTIONAL: what the agent last said, one line, <= 160 chars
-  "url": "https://app.devin.ai/sessions/abc"
+  "url": "https://app.devin.ai/sessions/abc",
                                // OPTIONAL: where the session lives when it isn't local.
                                // Required for entrypoint "cloud": a row click opens it
                                // (https:// or a vendor scheme like cursor://).
+  "herdr_pane": "w13:pE",      // OPTIONAL: local Herdr pane id hosting (or, via the
+                               // herdr-mirror plugin, mirroring) the session — a
+                               // frontend may select it on a row click
+  "herdr_host": "dexter",      // OPTIONAL, with herdr_remote_pane: the herdr-mirror
+  "herdr_remote_pane": "w1:pC" // host name and remote pane id when the session runs
+                               // on a remote Herdr; with no live herdr_pane a click
+                               // may `herdr-mirror restore <host> <pane>` to summon it
 }
 ```
 

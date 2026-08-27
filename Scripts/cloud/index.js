@@ -24,6 +24,7 @@ const ADAPTERS = [
   require("./adapters/cursor"),
   require("./adapters/devin"),
   require("./adapters/codex"),
+  require("./adapters/herdr"),
 ];
 
 const MAX_FAILURES = 10; // ~5 min at the default cadence before rows are declared stale
@@ -36,6 +37,7 @@ const FIX_LABELS = {
   cursor: "Cursor: check API key (cloud.json)",
   devin: "Devin: check API key (cloud.json)",
   codex: "Codex: run `codex login`",
+  herdr: "Herdr: remote poll failed (check ssh)",
 };
 
 const stateDir = path.join(os.homedir(), ".agentbar", "state.d");
@@ -109,6 +111,9 @@ const main = async () => {
     if (v.cfg.enabled && "apiKey" in v.cfg && !v.cfg.apiKey) {
       log(`${v.adapter.vendor}: no API key in ~/.agentbar/cloud.json — skipping`);
       v.cfg.enabled = false;
+    }
+    if (v.cfg.enabled && "hosts" in v.cfg && v.cfg.hosts.length === 0) {
+      v.cfg.enabled = false; // hostless herdr is the normal case, not worth a log line
     }
   }
   // Rows of a vendor the user disabled must not linger until the 24h expiry.

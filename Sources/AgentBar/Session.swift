@@ -30,6 +30,9 @@ struct Session {
     let model: String        // model name when the agent reports one ("" ok)
     let recap: String        // what the agent last said at turn end ("" ok)
     let url: String          // where the session lives when it isn't local ("" ok)
+    let herdrPane: String    // local Herdr pane hosting/mirroring the session ("" ok)
+    let herdrHost: String    // herdr-mirror host name for a remote session ("" ok)
+    let herdrRemotePane: String // pane id on that remote Herdr ("" ok)
 
     /// Sort/priority weight: what the menu bar should surface first.
     var priority: Int {
@@ -65,6 +68,9 @@ struct Session {
         model       = o["model"] as? String ?? ""
         recap       = o["recap"] as? String ?? ""
         url         = o["url"] as? String ?? ""
+        herdrPane   = o["herdr_pane"] as? String ?? ""
+        herdrHost   = o["herdr_host"] as? String ?? ""
+        herdrRemotePane = o["herdr_remote_pane"] as? String ?? ""
     }
 
     /// "‹1m" / "28m" / "3h" / "2d" — how long the session has been going.
@@ -110,6 +116,9 @@ struct Session {
         model = ""
         recap = ""
         url = ""
+        herdrPane = ""
+        herdrHost = ""
+        herdrRemotePane = ""
         decayed = false
     }
 
