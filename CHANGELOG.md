@@ -5,6 +5,21 @@ All notable changes to AgentBar are documented here. This project follows
 
 ## Unreleased
 
+### Fixed
+- **Connected Herdr machines open in the existing window, instantly.** A
+  remote-agent click finds the combined Herdr client through its SSH bridge
+  and clicks the saved machine's row in the client's sidebar — Ghostty's
+  scripting dictionary aims the mouse event at that exact surface, the row
+  is located in the surface's accessibility text first and the switch is
+  confirmed in it afterwards, so nothing opens and nothing is typed. The
+  remote agent's tab and pane are focused over ssh at the same time. Local
+  rows switch back to Local. Herdr's native navigator is only used when the
+  sidebar is collapsed, hidden, or scrolled past the machine. Ghostty
+  Automation and AgentBar Accessibility access are required; the jump stops
+  with a beep if the target cannot be verified. Herdr 0.9's separate client
+  tab selection is also updated explicitly, and named sessions cannot
+  receive default-session pane IDs.
+
 ## 1.12.0 - 2026-08-18
 
 ### Added

@@ -15,6 +15,23 @@ lands on the live pane in your local Herdr; if that mirror was closed, the
 click restores exactly it (`herdr-mirror restore <host> <pane>`) and then
 focuses it.
 
+For **Herdr 0.9 connected machines in Ghostty**, AgentBar finds the local client
+from its SSH bridge and clicks the machine's row in the client's sidebar —
+Ghostty's scripting dictionary sends the mouse event to that exact surface, and
+AgentBar reads the surface's accessibility text to locate the row first and to
+confirm the switch afterwards. Nothing opens and nothing is typed; the remote
+tab and pane are focused over ssh in parallel. This keeps the existing combined
+window; no separate remote terminal is opened. Local rows switch back to Local.
+Only when the sidebar is collapsed, hidden, or scrolled past the machine does
+AgentBar fall back to Herdr's native navigator, honoring the configured
+`keys.prefix` and `keys.goto` shortcuts. Allow AgentBar in macOS **Privacy &
+Security → Accessibility** and allow its Ghostty Automation request; Ghostty
+must have AppleScript enabled, and Herdr's `ui.mouse_capture` must stay on
+(the default). Ghostty's `window-padding-*` settings are read from its config
+files so the click lands on the right cell. An unverifiable target stops the
+jump with a beep. Profile targets must match `herdr.hosts` and use the default
+remote session, since that is the session the poller observes.
+
 ## Setup
 
 ```bash
