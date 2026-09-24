@@ -22,6 +22,12 @@ const DEFAULTS = {
   // Remote Herdr sessions over ssh. hosts are ssh targets: the string you pass
   // to `herdr --remote <host>` (or the herdr-mirror host name in hosts.toml).
   herdr: { enabled: true, hosts: [], termProgram: "Ghostty", pollSeconds: 20, recentHours: 48 },
+  // A self-hosted Omnigent server, polled with the Omnigent CLI's login. server
+  // "" = the one in ~/.omnigent/config.yaml; bin = the CLI launcher, whose
+  // Python renews the token. appServer "" = Omnigent.app's own server (links
+  // open there); openIn "web" = always the browser.
+  omnigent: { enabled: false, server: "", appServer: "", bin: "~/.local/bin/omnigent",
+              openIn: "app", pollSeconds: 15, recentHours: 24 },
 };
 
 const merge = (base, over) => {

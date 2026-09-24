@@ -7,6 +7,7 @@ const cursor = require("../adapters/cursor");
 const devin = require("../adapters/devin");
 const codex = require("../adapters/codex");
 const herdr = require("../adapters/herdr");
+const omnigent = require("../adapters/omnigent");
 const { keepRow, toProtocolRow, epoch } = require("../lib/policy");
 const { safeId } = require("../lib/state");
 const { DEFAULTS } = require("../lib/config");
@@ -281,6 +282,121 @@ test("herdr: hosts fail independently — a dead host keeps last-good rows for a
   // No host answering and nothing left to serve: the vendor poll itself fails.
   egdevUp = false;
   await assert.rejects(herdr.fetchRaw({ hosts: ["egdev"] }, list, new Map()), /egdev/);
+});
+
+// --- omnigent: shapes captured from a live `GET /v1/sessions` + `/v1/hosts` (2026-09-24)
+
+const omniSession = (over) => ({
+  id: "8a4bc9efff0248529f17d1277502afb7", agent_id: "ag_1", agent_name: "claude-native-ui",
+  status: "idle", created_at: NOW - 3000, updated_at: NOW - 600, title: "System operational check",
+  host_id: "94d35f487e8143aea400abb354884d62", workspace: "/home/ubuntu/projects/automation-testing",
+  viewer_unread: false, pending_elicitations_count: 0, parent_session_id: null, archived: false, ...over,
+});
+const omniRaw = (sessions, over) => ({
+  server: "http://egdev.tail33789d.ts.net:6767",
+  appServer: "https://egdev.tail33789d.ts.net:6443/",
+  sessions,
+  hosts: { "94d35f487e8143aea400abb354884d62": "egdev" },
+  harness: {},
+  ...over,
+});
+
+test("omnigent: states — a pending approval beats running; unread idle is done for an hour", () => {
+  const raw = omniRaw([
+    omniSession({ id: "run", status: "running" }),
+    omniSession({ id: "ask", status: "running", pending_elicitations_count: 1 }),
+    omniSession({ id: "wait", status: "waiting" }),
+    omniSession({ id: "fail", status: "failed" }),
+    omniSession({ id: "fresh", status: "idle", viewer_unread: true, updated_at: NOW - 600 }),
+    omniSession({ id: "stale", status: "idle", viewer_unread: true, updated_at: NOW - 7200 }),
+    omniSession({ id: "read", status: "idle" }),
+    omniSession({ id: "new", status: "hibernating" }),
+  ]);
+  const { rows, warnings } = omnigent.normalize(raw, DEFAULTS.omnigent, NOW);
+  assert.deepEqual(rows.map((r) => r.state),
+    ["thinking", "question", "question", "error", "done", "idle", "idle", "idle"]);
+  assert.deepEqual(warnings, ['unknown omnigent status "hibernating"']);
+});
+
+test("omnigent: rows carry the harness's agent, folder@host, and via Omnigent", () => {
+  const raw = omniRaw([
+    omniSession({ id: "a" }),
+    omniSession({ id: "b", agent_name: "native-codex", workspace: null }),
+    omniSession({ id: "c", agent_name: "polly" }),     // harness from the detail lookup
+    omniSession({ id: "d", agent_name: "goose-native" }), // no AgentBar mascot
+  ], { harness: { c: "claude-native" } });
+  const { rows } = omnigent.normalize(raw, DEFAULTS.omnigent, NOW);
+  assert.deepEqual(rows.map((r) => r.agent), ["claude", "codex", "claude", "omnigent"]);
+  assert.equal(rows[0].project, "automation-testing@egdev");
+  assert.equal(rows[1].project, "egdev");
+  assert.equal(rows[0].prompt, "System operational check");
+  const row = toProtocolRow(rows[0], omnigent, NOW, 4242);
+  assert.equal(row.via, "Omnigent");
+  assert.equal(row.entrypoint, "cloud"); // a click opens url; no approval affordances
+  assert.equal(row.sessionId, "omnigent-a");
+  assert.equal(omnigent.agentFor("claude_code:explore-supabase"), "claude");
+  assert.equal(omnigent.agentFor("agy"), "antigravity");
+  assert.equal(omnigent.agentFor("pineapple"), null); // whole tokens only
+});
+
+test("omnigent: app links only where the app infers the right scheme; else the web route", () => {
+  const url = (over, cfg = DEFAULTS.omnigent) =>
+    omnigent.normalize(omniRaw([omniSession({ id: "s1" })], over), cfg, NOW).rows[0].url;
+  assert.equal(url({}), "omnigent://egdev.tail33789d.ts.net:6443/c/s1");
+  assert.equal(url({ appServer: "http://127.0.0.1:6767/" }), "omnigent://127.0.0.1:6767/c/s1");
+  // Plain http off-loopback: the app would try https — open the session in the browser.
+  assert.equal(url({ appServer: "http://100.109.180.102:6767/" }), "http://100.109.180.102:6767/c/s1");
+  assert.equal(url({ appServer: "" }), "http://egdev.tail33789d.ts.net:6767/c/s1");
+  assert.equal(url({}, { ...DEFAULTS.omnigent, openIn: "web" }), "https://egdev.tail33789d.ts.net:6443/c/s1");
+});
+
+test("omnigent: expired token renews before polling; a 401 renews once; no login fails", async () => {
+  const server = "http://egdev.tail33789d.ts.net:6767";
+  const nowS = Date.now() / 1000;
+  const mkIO = ({ expires, statuses, refreshOK = true }) => {
+    const calls = { refresh: 0, gets: [] };
+    let tokens = { [server]: { token: "old", expires_at: expires, refresh_token: "r" } };
+    const io = {
+      configServer: () => `${server}/`,
+      readTokens: () => tokens,
+      refresh: async () => {
+        calls.refresh += 1;
+        if (refreshOK) tokens = { [server]: { token: "new", expires_at: nowS + 3600, refresh_token: "r2" } };
+        return refreshOK;
+      },
+      get: async (url, token) => {
+        calls.gets.push([url.replace(server, ""), token]);
+        const status = statuses.length ? statuses.shift() : 200;
+        const body = url.includes("/v1/hosts") ? { hosts: [{ host_id: "h", name: "egdev" }] }
+          : url.includes("/v1/sessions?") ? { data: [omniSession({ agent_name: "polly" }),
+                                                     omniSession({ id: "child", parent_session_id: "x" })] }
+          : { harness: "codex-native" };
+        return { status, body: status === 200 ? body : null };
+      },
+      appServer: () => "",
+    };
+    return { io, calls };
+  };
+  const fresh = () => ({ hosts: null, hostsAt: 0, harness: new Map() });
+
+  let { io, calls } = mkIO({ expires: nowS - 100, statuses: [] });
+  const raw = await omnigent.fetchRaw(DEFAULTS.omnigent, io, fresh());
+  assert.equal(calls.refresh, 1);
+  assert.ok(calls.gets.every(([, t]) => t === "new"));
+  assert.equal(raw.sessions.length, 1); // sub-agent child dropped
+  assert.deepEqual(raw.hosts, { h: "egdev" });
+  assert.deepEqual(raw.harness, { [raw.sessions[0].id]: "codex-native" });
+
+  ({ io, calls } = mkIO({ expires: nowS + 3600, statuses: [401] }));
+  await omnigent.fetchRaw(DEFAULTS.omnigent, io, fresh());
+  assert.equal(calls.refresh, 1);
+  assert.deepEqual(calls.gets.slice(0, 2).map(([, t]) => t), ["old", "new"]);
+
+  ({ io, calls } = mkIO({ expires: nowS - 100, statuses: [], refreshOK: false }));
+  await assert.rejects(omnigent.fetchRaw(DEFAULTS.omnigent, io, fresh()), /omnigent login/);
+
+  ({ io, calls } = mkIO({ expires: nowS + 3600, statuses: [503] }));
+  await assert.rejects(omnigent.fetchRaw(DEFAULTS.omnigent, io, fresh()), /HTTP 503/);
 });
 
 // --- retention / policy

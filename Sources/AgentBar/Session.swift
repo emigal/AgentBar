@@ -30,6 +30,7 @@ struct Session {
     let model: String        // model name when the agent reports one ("" ok)
     let recap: String        // what the agent last said at turn end ("" ok)
     let url: String          // where the session lives when it isn't local ("" ok)
+    let via: String          // surface a cloud row runs through, e.g. "Omnigent" ("" = the vendor's own)
     let herdrPane: String    // local Herdr pane hosting/mirroring the session ("" ok)
     let herdrHost: String    // remote Herdr host (ssh target) for a remote session ("" ok)
     let herdrRemotePane: String // pane id on that remote Herdr ("" ok)
@@ -68,6 +69,7 @@ struct Session {
         model       = o["model"] as? String ?? ""
         recap       = o["recap"] as? String ?? ""
         url         = o["url"] as? String ?? ""
+        via         = o["via"] as? String ?? ""
         herdrPane   = o["herdr_pane"] as? String ?? ""
         herdrHost   = o["herdr_host"] as? String ?? ""
         herdrRemotePane = o["herdr_remote_pane"] as? String ?? ""
@@ -116,6 +118,7 @@ struct Session {
         model = ""
         recap = ""
         url = ""
+        via = ""
         herdrPane = ""
         herdrHost = ""
         herdrRemotePane = ""

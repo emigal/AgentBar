@@ -34,6 +34,31 @@ files so the click lands on the right cell. An unverifiable target stops the
 jump with a beep. Profile targets must match `herdr.hosts` and use the default
 remote session, since that is the session the poller observes.
 
+A fifth adapter covers a **self-hosted Omnigent server** (`omnigent server` on
+a box you reach over e.g. Tailscale). Every session it runs — Claude Code,
+Codex, Pi, Goose… — becomes a row under that agent's own mascot (a ring for
+agents AgentBar has no mascot for), with an "Omnigent" chip and
+`folder@host`. It polls `GET /v1/sessions` with the Omnigent CLI's login: the
+bearer token in `~/.omnigent/auth_tokens.json`, renewed through the CLI's own
+Python (`omnigent.cli_auth.refresh_stored_token`, under the CLI's file lock)
+when it is about to expire. If that renewal fails, run `omnigent login`.
+
+A click opens the exact session in Omnigent.app through its deep link,
+`omnigent://<host>/c/<session>`. The link names only a host, and the app
+assumes http for localhost and https for everything else. So links are used
+only when the app's own server (read from its `settings.json`) is https or
+loopback. An app pinned to plain http on a LAN or Tailscale address would
+otherwise ask to trust an https server that isn't there. Those clicks open the
+same session in the browser instead (`<server>/c/<session>`). To get app links,
+put the server behind HTTPS, e.g. on the server box:
+
+```bash
+sudo tailscale serve --bg --https=6443 http://<tailscale-ip>:6767
+```
+
+then point Omnigent.app at `https://<box>.<tailnet>.ts.net:6443`. Rows switch
+to app links on the next poll.
+
 ## Setup
 
 ```bash
@@ -60,7 +85,12 @@ Config `~/.agentbar/cloud.json` (chmod 600 — it holds API keys):
               "hosts": ["dexter", "egdev"],    // ssh targets — the same string you pass
                                                // to `herdr --remote <host>` (or the
                                                // herdr-mirror host name in hosts.toml)
-              "termProgram": "Ghostty" }       // terminal hosting your Herdr tabs
+              "termProgram": "Ghostty" },      // terminal hosting your Herdr tabs
+  "omnigent": { "enabled": true,               // rides `omnigent login`, no key needed
+                "server": "",                  // "" = `server:` in ~/.omnigent/config.yaml
+                "appServer": "",               // "" = Omnigent.app's server (where links open)
+                "openIn": "app",               // "web" = always the browser
+                "recentHours": 24 }            // how long idle sessions stay listed
 }
 ```
 
@@ -74,7 +104,9 @@ environment instead of the file.
   `ssh -o BatchMode=yes <host> true` must succeed — a row click uses the same
   ssh to focus the pane). Hosts fail independently: a host that stops
   answering keeps its last rows for three polls, then drops them; the vendor
-  only fails (error row below) when every host does.
+  only fails (error row below) when every host does. omnigent 15 s: one
+  session list, plus a one-time detail lookup for sessions whose agent name
+  doesn't say which harness runs them.
 - After each **successful** vendor poll the vendor's rows are reconciled to the
   fresh set; a vendor that keeps failing (~5 min) gets its rows replaced by one
   clickable error row. Vendors never affect each other's rows.

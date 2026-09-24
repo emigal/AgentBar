@@ -27,7 +27,7 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
 
 ```json
 {
-  "agent": "claude",           // agent id: claude | codex | copilot | antigravity | cursor | gemini | qwen | opencode | pi | devin
+  "agent": "claude",           // agent id: claude | codex | copilot | antigravity | cursor | gemini | qwen | opencode | pi | devin | omnigent
                                // (writers may report other ids — e.g. kinds a remote
                                // Herdr recognizes; frontends MUST fall back to a
                                // default rendering rather than reject the row)
@@ -57,6 +57,9 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
                                // Cowork-tab rows use claude://claude.ai/cowork/cse_01… so a
                                // click opens that thread in Claude.app, not whichever
                                // tab was last focused.
+  "via": "Omnigent",           // OPTIONAL: the surface a cloud row runs through when it
+                               // isn't the agent's own vendor (an Omnigent server running
+                               // Claude Code) — frontends name it where they'd say "Cloud"
   "herdr_pane": "w13:pE",      // OPTIONAL: local Herdr pane id hosting (or, via the
                                // herdr-mirror plugin, mirroring) the session — a
                                // frontend may select it on a row click
@@ -219,4 +222,6 @@ pid** — rows die with the poller. Cloud writers MUST NOT write `requests.d`:
 remote approval is a rendezvous with a blocking local hook, and no such hook
 exists for a cloud session. Use `question` (not `permission`) when a cloud
 session waits on its user, so frontends never offer a keystroke approval that
-has nowhere to land.
+has nowhere to land. A poller for a self-hosted agent server (Omnigent) is a
+cloud writer too: `agent` names the agent running inside it (`omnigent` when
+AgentBar has no id for it) and `via` names the server.

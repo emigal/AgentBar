@@ -6,6 +6,15 @@ All notable changes to AgentBar are documented here. This project follows
 ## Unreleased
 
 ### Added
+- **Omnigent.** Sessions on a self-hosted Omnigent server show up as rows —
+  Claude Code, Codex, Pi… each under its own mascot, with an "Omnigent" chip and
+  `folder@host`. The cloud poller reads `GET /v1/sessions` with the Omnigent
+  CLI's login (renewed through the CLI's own refresh). A pending approval shows
+  as needs-you. A click opens that exact session in Omnigent.app
+  (`omnigent://<host>/c/<id>`) when the app's server is https or localhost,
+  and the same session in the browser otherwise. Enable with
+  `"omnigent": {"enabled": true}` in `~/.agentbar/cloud.json`. New optional
+  protocol field `via`.
 - **Remote Herdr over `herdr --remote`.** Agents on a machine you attach to
   natively show up as rows (cloud poller, `herdr.hosts` in `cloud.json` — the
   same string you pass to `--remote`). A row click focuses the pane on the

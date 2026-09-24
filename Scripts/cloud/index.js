@@ -25,6 +25,7 @@ const ADAPTERS = [
   require("./adapters/devin"),
   require("./adapters/codex"),
   require("./adapters/herdr"),
+  require("./adapters/omnigent"),
 ];
 
 const MAX_FAILURES = 10; // ~5 min at the default cadence before rows are declared stale
@@ -38,6 +39,7 @@ const FIX_LABELS = {
   devin: "Devin: check API key (cloud.json)",
   codex: "Codex: run `codex login`",
   herdr: "Herdr: remote poll failed (check ssh)",
+  omnigent: "Omnigent: poll failed (server down, or run `omnigent login`)",
 };
 
 const stateDir = path.join(os.homedir(), ".agentbar", "state.d");

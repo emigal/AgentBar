@@ -476,7 +476,7 @@ final class IslandRowView: NSView {
         var out = [chip(agent.name, tint: agent.brand)]
         if let m = s.modelChip { out.append(chip(m, tint: NSColor.white.withAlphaComponent(0.85))) }
         if s.entrypoint == "cloud" {
-            out.append(chip("Cloud", tint: .white))
+            out.append(chip(s.via.isEmpty ? "Cloud" : s.via, tint: .white))
         } else if s.entrypoint == "claude-desktop" {
             out.append(chip("Desktop", tint: .white))
         } else if s.hostedInApp {

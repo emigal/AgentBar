@@ -35,6 +35,8 @@ const tsFrozen = (state) => isTerminal(state) || state === "idle";
 // die with the poller. A run may override the adapter-level agent id and the
 // "cloud" entrypoint: herdr rows carry their real agent and live in a local
 // mirror pane (entrypoint "", herdr_* pointing the frontend at it), not at a URL.
+// `via` names the surface a cloud row runs through when that isn't the agent's
+// own vendor (Omnigent running Claude Code) — frontends show it instead of "Cloud".
 const toProtocolRow = (run, { agentId, prefix }, now, pid) => ({
   agent: run.agent || agentId,
   state: run.state,
@@ -50,6 +52,7 @@ const toProtocolRow = (run, { agentId, prefix }, now, pid) => ({
   ...(run.started_at ? { started_at: run.started_at } : {}),
   ...(run.prompt ? { prompt: oneLine(run.prompt, 120) } : {}),
   ...(run.recap ? { recap: oneLine(run.recap, 160) } : {}),
+  ...(run.via ? { via: oneLine(run.via, 20) } : {}),
   ...(run.herdr_pane ? { herdr_pane: run.herdr_pane } : {}),
   ...(run.herdr_host ? { herdr_host: run.herdr_host,
                          herdr_remote_pane: run.herdr_remote_pane || "" } : {}),

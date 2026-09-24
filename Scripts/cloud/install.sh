@@ -26,7 +26,8 @@ if [ ! -f "$CONFIG" ]; then
 {
   "cursor": { "enabled": false, "apiKey": "" },
   "devin":  { "enabled": false, "apiKey": "" },
-  "codex":  { "enabled": true }
+  "codex":  { "enabled": true },
+  "omnigent": { "enabled": false }
 }
 JSON
   chmod 600 "$CONFIG"

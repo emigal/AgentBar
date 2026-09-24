@@ -91,6 +91,14 @@ struct Agent {
               artwork: .tintedMark(devinMarkPNG),
               open: .url("https://app.devin.ai"),
               approveKeys: nil),
+        // Self-hosted agent server: rows come from the external poller
+        // (Scripts/cloud/adapters/omnigent.js). Sessions whose harness AgentBar
+        // knows (Claude, Codex, Pi…) wear that agent's mascot; this is the rest.
+        Agent(id: "omnigent", name: "Omnigent",
+              brand: NSColor(srgbRed: 0.941, green: 0.212, blue: 0.588, alpha: 1), // #F03696 — icon accent
+              artwork: .tintedMark(omnigentMarkPNG),
+              open: .bundle("ai.omnigent.desktop"),
+              approveKeys: nil),
     ]
 
     static func byID(_ id: String) -> Agent { all.first { $0.id == id } ?? all[0] }
