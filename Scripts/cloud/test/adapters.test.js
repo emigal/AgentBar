@@ -1,5 +1,5 @@
 // Pure-function tests for the cloud poller: adapter normalization, retention
-// policy, and protocol-row assembly. Run: node --test Scripts/cloud/test/
+// policy, and protocol-row assembly. Run: node --test Scripts/cloud/test/*.test.js
 const { test } = require("node:test");
 const assert = require("node:assert");
 
@@ -207,6 +207,80 @@ test("herdr: rows land in a local pane, not at a url — entrypoint stays overri
   assert.equal(row.herdr_pane, "w13:pE");
   assert.equal(row.herdr_host, "dexter");
   assert.equal(row.sessionId, "herdr-dexter-term_6598124a35ac4c");
+});
+
+// --- herdr: a host attached natively (`herdr --remote egdev`), no mirror plugin (2026-09-05)
+
+const egdevFixture = {
+  hosts: [{
+    host: "egdev",
+    agents: [
+      { agent: "pi", agent_status: "working", cwd: "/home/ubuntu/.herdr/worktrees/mtwr-two/mtwr-two-8c5a98e8e8",
+        pane_id: "w8:p8", tab_id: "w8:t4", state_change_seq: 84, terminal_id: "term_65ab7aa1185d34b",
+        terminal_title_stripped: "π - mtwr-two-8c5a98e8e8" },
+      { agent: "claude", agent_status: "idle", cwd: "/home/ubuntu/.herdr/worktrees/mtwr-two/mtwr-two-8c5a98e8e8",
+        pane_id: "w8:p9", tab_id: "w8:t5", state_change_seq: 86, terminal_id: "term_65ab7aa11a6894c",
+        terminal_title_stripped: "Claude Code" },
+    ],
+    panes: {},
+  }],
+};
+
+test("herdr: a natively attached host has no mirror — rows name the remote pane only", () => {
+  const { rows, warnings } = herdr.normalize(egdevFixture, DEFAULTS.herdr, NOW, new Map());
+  assert.equal(rows.length, 2);
+  assert.deepEqual(warnings, []);
+  assert.equal(rows[0].agent, "pi");
+  assert.equal(rows[0].state, "thinking");
+  assert.equal(rows[0].project, "mtwr-two-8c5a98e8e8@egdev");
+  assert.equal(rows[0].herdr_pane, "");
+  assert.equal(rows[0].herdr_host, "egdev");
+  assert.equal(rows[0].herdr_remote_pane, "w8:p8");
+  const row = toProtocolRow(rows[0], herdr, NOW, 4242);
+  assert.equal(row.sessionId, "herdr-egdev-term_65ab7aa1185d34b");
+  assert.equal(row.agent, "pi");
+  assert.equal(row.entrypoint, "");
+  assert.equal("herdr_pane" in row, false); // no local pane: the frontend picks the transport
+  assert.equal(row.herdr_host, "egdev");
+  assert.equal(row.herdr_remote_pane, "w8:p8");
+});
+
+test("herdr: hosts fail independently — a dead host keeps last-good rows for a few polls, then drops", async () => {
+  const memory = new Map();
+  const cfg = { hosts: ["dexter", "egdev"] };
+  let egdevUp = true;
+  const list = async (host) => {
+    if (host === "egdev" && !egdevUp) throw new Error(`${host}: ssh: connect timed out`);
+    return [{ agent: "claude", agent_status: "idle", cwd: `/home/${host}`, pane_id: "w1:p1",
+              state_change_seq: 1, terminal_id: `term_${host}` }];
+  };
+  let raw = await herdr.fetchRaw(cfg, list, memory);
+  assert.deepEqual(raw.hosts.map((h) => h.host), ["dexter", "egdev"]);
+  assert.deepEqual(raw.failed, []);
+
+  egdevUp = false;
+  for (let i = 0; i < herdr.STALE_POLLS; i++) {
+    raw = await herdr.fetchRaw(cfg, list, memory);
+    assert.deepEqual(raw.hosts.map((h) => h.host), ["dexter", "egdev"]); // still served from last-good
+    assert.equal(raw.hosts[1].stale, "egdev: ssh: connect timed out");
+    assert.deepEqual(raw.failed, []);
+  }
+  raw = await herdr.fetchRaw(cfg, list, memory);
+  assert.deepEqual(raw.hosts.map((h) => h.host), ["dexter"]); // budget spent: egdev is out
+  assert.equal(raw.failed.length, 1);
+  assert.equal(raw.failed[0].host, "egdev");
+  const { rows, warnings } = herdr.normalize(raw, DEFAULTS.herdr, NOW, new Map());
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].herdr_host, "dexter");
+  assert.match(warnings[0], /^egdev: unreachable/);
+
+  egdevUp = true; // back: rows return on the very next poll
+  raw = await herdr.fetchRaw(cfg, list, memory);
+  assert.deepEqual(raw.hosts.map((h) => h.host), ["dexter", "egdev"]);
+
+  // No host answering and nothing left to serve: the vendor poll itself fails.
+  egdevUp = false;
+  await assert.rejects(herdr.fetchRaw({ hosts: ["egdev"] }, list, new Map()), /egdev/);
 });
 
 // --- retention / policy

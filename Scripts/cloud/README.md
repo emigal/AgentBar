@@ -9,11 +9,13 @@ optional `url` field.
 
 A fourth adapter covers **remote Herdr machines**: `ssh <host> herdr agent
 list` surfaces every agent Herdr recognizes there (no AgentBar hooks needed on
-the remote). Those rows aren't cloud rows — they point at the local
-herdr-mirror pane mirroring the remote session (`herdr_pane`), so a click
-lands on the live pane in your local Herdr; if that mirror was closed, the
-click restores exactly it (`herdr-mirror restore <host> <pane>`) and then
-focuses it.
+the remote). Those rows aren't cloud rows — they name the remote pane, and a
+click goes wherever you view that machine from: a connected machine in an
+existing combined Herdr window, a `herdr --remote <host>` tab
+(the pane is focused over ssh and that tab comes forward), or a herdr-mirror
+pane (`herdr_pane`) — if that mirror was closed, the click restores exactly it
+(`herdr-mirror restore <host> <pane>`) and then focuses it. With neither open,
+the pane is still focused on the remote so the next attach lands on it.
 
 For **Herdr 0.9 connected machines in Ghostty**, AgentBar finds the local client
 from its SSH bridge and clicks the machine's row in the client's sidebar —
@@ -55,9 +57,10 @@ Config `~/.agentbar/cloud.json` (chmod 600 — it holds API keys):
               "recentHours": 48, "showSuspended": false },
   "codex":  { "enabled": true },               // rides `codex login`, no key needed
   "herdr":  { "enabled": true,
-              "hosts": ["dexter"],             // ssh targets; each must also be the
-                                               // herdr-mirror host name (hosts.toml)
-              "termProgram": "Ghostty" }       // terminal hosting your local Herdr
+              "hosts": ["dexter", "egdev"],    // ssh targets — the same string you pass
+                                               // to `herdr --remote <host>` (or the
+                                               // herdr-mirror host name in hosts.toml)
+              "termProgram": "Ghostty" }       // terminal hosting your Herdr tabs
 }
 ```
 
@@ -68,7 +71,10 @@ environment instead of the file.
 
 - Poll every 30 s (codex 60 s — it shells out to `codex cloud list --json`;
   herdr 20 s — one `ssh <host> herdr agent list` per host, key auth required:
-  `ssh -o BatchMode=yes <host> true` must succeed).
+  `ssh -o BatchMode=yes <host> true` must succeed — a row click uses the same
+  ssh to focus the pane). Hosts fail independently: a host that stops
+  answering keeps its last rows for three polls, then drops them; the vendor
+  only fails (error row below) when every host does.
 - After each **successful** vendor poll the vendor's rows are reconciled to the
   fresh set; a vendor that keeps failing (~5 min) gets its rows replaced by one
   clickable error row. Vendors never affect each other's rows.
@@ -80,5 +86,5 @@ environment instead of the file.
 
 ```bash
 node Scripts/cloud/index.js --once   # single poll, then exit
-node --test Scripts/cloud/test/      # pure-function tests, no network
+node --test Scripts/cloud/test/*.test.js      # pure-function tests, no network
 ```

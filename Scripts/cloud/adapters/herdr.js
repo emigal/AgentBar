@@ -1,9 +1,10 @@
 // Remote Herdr sessions -> normalized runs. One `ssh <host> herdr agent list`
 // per poll surfaces every agent Herdr recognizes on that machine (Claude Code,
-// Codex, anything with a Herdr integration — no AgentBar hooks needed there).
-// The herdr-mirror plugin's map file translates each remote pane to its local
-// mirror pane, so a row click lands on the live mirror inside the local Herdr
-// (TerminalFocus reads the herdr_* fields this adapter writes).
+// Codex, Pi, anything with a Herdr integration — no AgentBar hooks needed
+// there). Rows name the host and the remote pane; how a click gets there is the
+// frontend's call (TerminalFocus reads the herdr_* fields): a live herdr-mirror
+// pane — this adapter maps it through the plugin's map file into herdr_pane —
+// a running `herdr --remote <host>` client, or a plain ssh `herdr agent focus`.
 
 const { execFile } = require("child_process");
 const fs = require("fs");
@@ -22,18 +23,18 @@ const LABELS = { thinking: "Working", permission: "Needs approval", done: "Done"
 
 const sshList = (host) => new Promise((resolve, reject) => {
   // Non-interactive ssh skips the remote's rc files, so ~/.local/bin (where
-  // `herdr plugin install` links binaries) is put on PATH by hand.
+  // Herdr installs) is put on PATH by hand.
   execFile("ssh",
     ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8", host,
      'PATH="$HOME/.local/bin:$PATH" herdr agent list'],
     { timeout: 20_000, maxBuffer: 4 * 1024 * 1024 },
     (err, stdout) => {
-      if (err) return reject(new Error(`herdr ${host}: ${err.message.split("\n")[0]}`));
+      if (err) return reject(new Error(`${host}: ${err.message.split("\n")[0]}`));
       try {
         const o = JSON.parse(stdout);
         resolve(o.result?.agents || o.agents || []);
       } catch {
-        reject(new Error(`herdr ${host}: unparseable agent list`));
+        reject(new Error(`${host}: unparseable agent list`));
       }
     });
 });
@@ -50,15 +51,38 @@ const readMap = (host) => {
   }
 };
 
-const fetchRaw = async (cfg) => {
+// Hosts fail independently: a box that is switched off must not take another
+// host's rows with it. A host that just stopped answering keeps its last-good
+// agents for a few polls (an ssh blip must neither flicker rows nor reset
+// their clocks), then drops out — its rows vanish on the next reconcile, which
+// is right for a machine that is off. Only when no host answers does the
+// vendor poll fail: the framework's failure budget and its error row cover ssh
+// being broken everywhere. `list` and `memory` are injectable for tests.
+const STALE_POLLS = 3;
+const lastGood = new Map(); // host -> { agents, failures }
+const fetchRaw = async (cfg, list = sshList, memory = lastGood) => {
   const hosts = [];
-  // Sequential and all-or-nothing: one unreachable host fails the vendor poll,
-  // which keeps the last-good rows (then the framework's failure budget takes
-  // over) instead of silently dropping that host's sessions.
+  const failed = [];
   for (const host of cfg.hosts) {
-    hosts.push({ host, agents: await sshList(host), panes: readMap(host) });
+    try {
+      const agents = await list(host);
+      memory.set(host, { agents, failures: 0 });
+      hosts.push({ host, agents, panes: readMap(host) });
+    } catch (e) {
+      const prev = memory.get(host);
+      if (prev && prev.failures < STALE_POLLS) {
+        prev.failures += 1;
+        hosts.push({ host, agents: prev.agents, panes: readMap(host), stale: e.message });
+      } else {
+        memory.delete(host);
+        failed.push({ host, error: e.message });
+      }
+    }
   }
-  return { hosts };
+  if (hosts.length === 0 && failed.length > 0) {
+    throw new Error(`herdr ${failed.map((f) => f.error).join("; ")}`);
+  }
+  return { hosts, failed };
 };
 
 // `herdr agent list` carries no timestamps, only state_change_seq (a counter
@@ -75,7 +99,7 @@ const track = (id, seq, cache, now) => {
 
 const normalize = (raw, cfg, now, cache = seen) => {
   const rows = [];
-  const warnings = [];
+  const warnings = (raw.failed || []).map((f) => `${f.host}: unreachable, rows dropped (${f.error})`);
   const fresh = new Set();
   for (const { host, agents, panes } of raw.hosts || []) {
     for (const a of agents || []) {
@@ -98,7 +122,7 @@ const normalize = (raw, cfg, now, cache = seen) => {
         label: LABELS[state] || "",
         project: `${path.posix.basename(a.cwd || "") || host}@${host}`,
         prompt: a.terminal_title_stripped || a.title || "",
-        entrypoint: "", // lives in a local (mirror) pane, not at a URL
+        entrypoint: "", // lives in a Herdr pane you can reach locally, not at a URL
         term_program: cfg.termProgram,
         herdr_pane: pane && pane.tombstone !== true ? pane.localId : "",
         herdr_host: host,
@@ -113,4 +137,4 @@ const normalize = (raw, cfg, now, cache = seen) => {
   return { rows, warnings };
 };
 
-module.exports = { vendor, agentId, prefix, fetchRaw, normalize };
+module.exports = { vendor, agentId, prefix, fetchRaw, normalize, STALE_POLLS };

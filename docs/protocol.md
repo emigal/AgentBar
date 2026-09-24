@@ -56,10 +56,15 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
   "herdr_pane": "w13:pE",      // OPTIONAL: local Herdr pane id hosting (or, via the
                                // herdr-mirror plugin, mirroring) the session — a
                                // frontend may select it on a row click
-  "herdr_host": "dexter",      // OPTIONAL, with herdr_remote_pane: the herdr-mirror
-  "herdr_remote_pane": "w1:pC" // host name and remote pane id when the session runs
-                               // on a remote Herdr; with no live herdr_pane a click
-                               // may `herdr-mirror restore <host> <pane>` to summon it
+  "herdr_host": "egdev",       // OPTIONAL, with herdr_remote_pane: the remote Herdr's
+  "herdr_remote_pane": "w8:p9" // host (an ssh target; also the herdr-mirror host name
+                               // when that plugin is in use) and the pane id there.
+                               // With no live herdr_pane a click may focus the pane
+                               // in an existing connected-machine client (machine
+                               // selection is client-side), or focus the pane
+                               // over ssh (`herdr agent focus`) and land on a running
+                               // `herdr --remote <host>` client, or `herdr-mirror
+                               // restore <host> <pane>` to summon the mirror
 }
 ```
 

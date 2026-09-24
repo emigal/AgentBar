@@ -5,6 +5,20 @@ All notable changes to AgentBar are documented here. This project follows
 
 ## Unreleased
 
+### Added
+- **Remote Herdr over `herdr --remote`.** Agents on a machine you attach to
+  natively show up as rows (cloud poller, `herdr.hosts` in `cloud.json` — the
+  same string you pass to `--remote`). A row click focuses the pane on the
+  remote over ssh and brings the `herdr --remote <host>` tab forward; with no
+  attach open the pane is still focused for the next one. Hosts now fail
+  independently: a box that is switched off keeps its rows for three polls,
+  then drops them, without touching another host's rows.
+- **Ghostty exact-tab jump-back.** Ghostty's scripting dictionary exposes each
+  surface's tty, so row clicks (and Approve plan) now select the exact Ghostty
+  tab like they do in iTerm2, Terminal.app, and WezTerm. Sessions in a Herdr
+  pane select the tab hosting the Herdr client, in every terminal — the agent's
+  own pty belongs to the Herdr server and never matched a tab before.
+
 ### Fixed
 - **Connected Herdr machines open in the existing window, instantly.** A
   remote-agent click finds the combined Herdr client through its SSH bridge

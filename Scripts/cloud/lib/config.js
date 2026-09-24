@@ -19,8 +19,8 @@ const DEFAULTS = {
   devin: { enabled: true, apiKey: "", orgId: "", openIn: "app", recentHours: 48,
            showSuspended: true, suspendedHours: 24 },
   codex: { enabled: true, bin: "codex", pollSeconds: 60, recentHours: 48 },
-  // Remote Herdr sessions over ssh. hosts are ssh targets that must also match
-  // the herdr-mirror host name (hosts.toml) for row clicks to find the mirror.
+  // Remote Herdr sessions over ssh. hosts are ssh targets: the string you pass
+  // to `herdr --remote <host>` (or the herdr-mirror host name in hosts.toml).
   herdr: { enabled: true, hosts: [], termProgram: "Ghostty", pollSeconds: 20, recentHours: 48 },
 };
 

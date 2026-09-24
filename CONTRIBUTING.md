@@ -26,6 +26,7 @@ Thanks for your interest! AgentBar is intentionally small — please keep it tha
 open build/AgentBar.app
 ./Scripts/test/permission-hook-test.sh    # hook protocol tests
 ./Scripts/test/cli-test.sh                # cross-platform CLI tests
+./Scripts/test/terminal-focus-test.sh     # TerminalFocus pure-function tests (Herdr matching, attach discovery)
 ./Scripts/test/antigravity-watcher-test.sh # live-app integration test (needs the app running)
 ./Scripts/test/cowork-watcher-test.sh     # live-app integration test (needs AgentBar + Claude.app running)
 ```

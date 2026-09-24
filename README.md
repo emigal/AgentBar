@@ -108,7 +108,8 @@ don't use. Hooks are snapshotted per session — start a new agent session after
 - **A failure looks like one** — a turn that errors out shows red and named
   instead of a green "Done", and never plays the finish chime.
 - **Precise jump-back** — clicking a session row selects the exact terminal tab
-  or split pane the session runs in (iTerm2, Terminal.app, WezTerm — by tty),
+  or split pane the session runs in (iTerm2, Terminal.app, WezTerm, Ghostty —
+  by tty),
   not just the app.
 - **Turn recaps** — a finished session's row says *what* finished: one line of the
   agent's closing words under "Done", not just a green dot.
@@ -305,7 +306,7 @@ ignores a hook's *allow* at the plan dialog, because approving a plan also
 picks the next permission mode — something a hook decision can't express. So
 **Approve plan** selects the session's exact tab and answers the dialog there.
 It needs Accessibility, and a terminal AgentBar can aim (iTerm2, Terminal.app,
-WezTerm); anywhere else the button hands you the dialog instead of typing into
+WezTerm, Ghostty); anywhere else the button hands you the dialog instead of typing into
 a tab it cannot verify. **Keep planning** needs none of that — it goes through
 the hook as an explicit "refine this first".
 

@@ -31,7 +31,7 @@ struct Session {
     let recap: String        // what the agent last said at turn end ("" ok)
     let url: String          // where the session lives when it isn't local ("" ok)
     let herdrPane: String    // local Herdr pane hosting/mirroring the session ("" ok)
-    let herdrHost: String    // herdr-mirror host name for a remote session ("" ok)
+    let herdrHost: String    // remote Herdr host (ssh target) for a remote session ("" ok)
     let herdrRemotePane: String // pane id on that remote Herdr ("" ok)
 
     /// Sort/priority weight: what the menu bar should surface first.
