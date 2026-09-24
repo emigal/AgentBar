@@ -127,10 +127,13 @@ const main = async () => {
   }
   log(`polling ${enabled.map((v) => v.adapter.vendor).join(", ")} (pid ${process.pid})`);
 
-  const tick = async () => {
+  // Vendors poll concurrently — each owns its busy flag and its file prefix —
+  // so a slow one (ssh to a sleeping herdr host, `codex cloud list`) never
+  // holds up a fast one's cadence.
+  const tick = () => {
     const t = now();
-    for (const v of enabled) {
-      if (v.busy || t < v.due) continue;
+    return Promise.all(enabled.map(async (v) => {
+      if (v.busy || t < v.due) return;
       v.busy = true;
       v.due = t + v.everySeconds;
       try {
@@ -140,7 +143,7 @@ const main = async () => {
       } finally {
         v.busy = false;
       }
-    }
+    }));
   };
 
   await tick();
