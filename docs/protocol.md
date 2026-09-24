@@ -27,7 +27,7 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
 
 ```json
 {
-  "agent": "claude",           // agent id: claude | codex | copilot | antigravity | cursor | gemini | qwen | opencode | devin
+  "agent": "claude",           // agent id: claude | codex | copilot | antigravity | cursor | gemini | qwen | opencode | pi | devin
                                // (writers may report other ids — e.g. kinds a remote
                                // Herdr recognizes; frontends MUST fall back to a
                                // default rendering rather than reject the row)
@@ -77,7 +77,7 @@ Rules:
   later event doesn't know (e.g. `entrypoint`) survive.
 - `state: "end"` is not written — the session's file is **deleted** instead.
 - `error` means the turn ended badly (Qwen's `StopFailure`, OpenCode's
-  `session.error`). It is a *finished* state like `done`, but frontends MUST NOT
+  `session.error`, Pi's `after_provider_response` status ≥ 400). It is a *finished* state like `done`, but frontends MUST NOT
   celebrate it: no green tick, no done sound. `label` carries the reason when the
   agent gives one. Writers that can't tell success from failure keep using
   `done`; frontends that predate `error` decode it as `idle`, which is harmless.

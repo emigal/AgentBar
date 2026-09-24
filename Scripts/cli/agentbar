@@ -14,7 +14,7 @@
 //   agentbar waybar                 one-line JSON for waybar/polybar custom modules
 //                                   (each call refreshes the heartbeat; poll <= 30s)
 //   agentbar install-hooks          wire agent hooks (Claude/Codex/Cursor/Antigravity/
-//                                   Gemini) —
+//                                   Gemini/Pi) —
 //                                   the Linux equivalent of the macOS app's installer
 
 "use strict";
@@ -484,6 +484,34 @@ function installHooks() {
       report("gemini  " + file, writeIfChanged(file, root));
     }
   }
+
+  // Pi — ~/.pi/agent/extensions/agentbar.ts (and PI_CODING_AGENT_DIR when set).
+  // Observe-only TypeScript extension; copy refreshes with the CLI version.
+  const piDirs = [];
+  if (process.env.PI_CODING_AGENT_DIR) {
+    const d = process.env.PI_CODING_AGENT_DIR.replace(/^~/, os.homedir());
+    if (fs.existsSync(d)) piDirs.push(d);
+  }
+  if (fs.existsSync(path.join(os.homedir(), ".pi"))) {
+    piDirs.push(path.join(os.homedir(), ".pi", "agent"));
+  }
+  const piSeen = new Set();
+  const piSrc = path.join(hooksDir, "pi", "agentbar.ts");
+  if (fs.existsSync(piSrc)) {
+    const piData = fs.readFileSync(piSrc);
+    for (const agentDir of piDirs) {
+      const resolved = fs.existsSync(agentDir) ? fs.realpathSync(agentDir) : agentDir;
+      if (piSeen.has(resolved)) continue;
+      piSeen.add(resolved);
+      const dest = path.join(agentDir, "extensions", "agentbar.ts");
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      let same = false;
+      try { same = fs.readFileSync(dest).equals(piData); } catch {}
+      if (!same) fs.writeFileSync(dest, piData);
+      report("pi      " + dest, !same);
+    }
+  }
+
   console.log("Done. Start a NEW agent session to see it (hooks snapshot at session start).");
 }
 
@@ -511,6 +539,6 @@ switch (cmd) {
   agentbar watch [-i SEC]         live view + keys (a allow/A always/d deny/f defer/1-9 answer/q quit);
                                   enables remote approval
   agentbar waybar                 JSON for waybar/polybar (poll <= 30s)
-  agentbar install-hooks          wire Claude/Codex/Cursor/Antigravity/Gemini hooks (Linux installer)`);
+  agentbar install-hooks          wire Claude/Codex/Cursor/Antigravity/Gemini/Pi hooks (Linux installer)`);
     break;
 }

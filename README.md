@@ -20,7 +20,7 @@
 
 AgentBar is a lightweight, native macOS app that shows the live state of your
 AI coding sessions — Claude Code and Claude Cowork, Codex, Cursor, Gemini CLI,
-Qwen Code, OpenCode, plus GitHub Copilot and Google Antigravity in one place. Each agent gets its own mark built from its
+Qwen Code, OpenCode, Pi, plus GitHub Copilot and Google Antigravity in one place. Each agent gets its own mark built from its
 real identity — Clawd the crab for Claude, the OpenAI knot with a braille dot-matrix
 for Codex, the official pixel-art head for Copilot, the pixel rainbow arch for
 Antigravity — and it always surfaces the session that needs you most.
@@ -58,6 +58,7 @@ all reversible (see [Uninstall](#uninstall)):
   merges into `~/.cursor/hooks.json` / `~/.gemini/settings.json` / `~/.qwen/settings.json`
   **only if those exist**.
 - Copies a plugin to `~/.config/opencode/plugins/agentbar.js` **only if you use OpenCode**.
+- Copies an extension to `~/.pi/agent/extensions/agentbar.ts` **only if you use Pi**.
 - The SessionStart hook launches AgentBar in the background when an agent session begins.
 - Nothing else is granted automatically: the exact-tab jump-back asks for
   **Automation** access the first time you click a row, and approving a plan
@@ -184,7 +185,7 @@ and the hooks are plain Node — so on Linux, the `agentbar` CLI is the frontend
 
 ```bash
 git clone https://github.com/michalstrnadel/AgentBar.git && cd AgentBar
-./Scripts/cli/agentbar install-hooks   # wires Claude/Codex/Cursor/Gemini hooks
+./Scripts/cli/agentbar install-hooks   # wires Claude/Codex/Cursor/Gemini/Pi hooks
 sudo ln -s "$PWD/Scripts/cli/agentbar" /usr/local/bin/agentbar   # optional
 
 agentbar                 # session list (same rows as the macOS menu)
@@ -221,6 +222,7 @@ rm -rf ~/.agentbar
 #   ~/.gemini/settings.json    — delete hook groups whose command references "/.agentbar/hooks/gemini/"
 #   ~/.qwen/settings.json      — delete hook groups whose command references "/.agentbar/hooks/claude/"
 rm -f ~/.config/opencode/plugins/agentbar.js
+rm -f ~/.pi/agent/extensions/agentbar.ts
 ```
 
 ## Agent support
@@ -235,11 +237,12 @@ rm -f ~/.config/opencode/plugins/agentbar.js
 | GitHub Copilot | — | yes | pixel head + dot-matrix | no public event API yet; everything else is wired and waiting |
 | Qwen Code | working / done / failed | yes | Q ring | Claude-style hooks in `~/.qwen/settings.json` (auto-wired if Qwen is installed); remote approval waits until its decision contract is verified |
 | OpenCode | working / approval / done / failed | yes | prompt chevron | plugin in `~/.config/opencode/plugins/` (auto-installed if OpenCode is installed); observe-only |
+| Pi | working / done / failed | yes | π | extension in `~/.pi/agent/extensions/` (auto-installed if Pi is installed); observe-only |
 | Google Antigravity | working / done | yes | pixel rainbow arch + dot-matrix | hooks in `~/.gemini/antigravity{,-cli}/hooks.json` (auto-wired); desktop 2.3.x only honors per-workspace `.agents/hooks.json`, and only `PostToolUse` fires — quiet sessions decay to done |
 
 Hook readiness: Claude Code, Codex (`notify`), Cursor (`hooks.json`), Gemini
-(`settings.json`), Antigravity (`hooks.json`), Qwen Code (`settings.json`), and
-OpenCode (plugin) hooks all install automatically at launch (idempotently — every
+(`settings.json`), Antigravity (`hooks.json`), Qwen Code (`settings.json`),
+OpenCode (plugin), and Pi (extension) hooks all install automatically at launch (idempotently — every
 launch re-checks, nothing is duplicated) for the tools you have. Copilot ships with its mascot, menu entry, and
 the keystroke-approval backend already in place — the moment it exposes session
 events, support is one small hook script away.

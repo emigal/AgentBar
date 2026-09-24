@@ -6,10 +6,10 @@ cd "$(dirname "$0")/../.."
 CLI="Scripts/cli/agentbar"
 NODE="${NODE:-node}"
 
-# install-hooks honors CLAUDE_CONFIG_DIR — a value inherited from the runner's
-# shell would make the test wire hooks into the runner's REAL Claude config,
-# pointing at this suite's throwaway temp dir (learned the hard way).
-unset CLAUDE_CONFIG_DIR AGENTBAR_FORCE_APP AGENTBAR_APPROVAL_TIMEOUT
+# install-hooks honors CLAUDE_CONFIG_DIR / PI_CODING_AGENT_DIR — a value
+# inherited from the runner's shell would make the test wire hooks into the
+# runner's REAL agent config (learned the hard way).
+unset CLAUDE_CONFIG_DIR PI_CODING_AGENT_DIR AGENTBAR_FORCE_APP AGENTBAR_APPROVAL_TIMEOUT
 
 pass=0; fail=0
 check() {
@@ -130,6 +130,12 @@ echo '{broken' > "$HOME/.gemini/settings.json"
 check "unparseable config untouched"   '[ "$(cat "$HOME/.gemini/settings.json")" = "{broken" ]'
 CLAUDE_CONFIG_DIR="$HOME/.claude-custom" "$CLI" install-hooks >/dev/null 2>&1
 check "CLAUDE_CONFIG_DIR wired (contained)" 'grep -q PermissionRequest "$HOME/.claude-custom/settings.json"'
+mkdir -p "$HOME/.pi/agent"
+"$CLI" install-hooks >/dev/null 2>&1
+check "pi extension installed"         'grep -q "const AGENT = \"pi\"" "$HOME/.pi/agent/extensions/agentbar.ts"'
+SNAPPI="$(cat "$HOME/.pi/agent/extensions/agentbar.ts")"
+"$CLI" install-hooks >/dev/null 2>&1
+check "pi install-hooks idempotent"    '[ "$SNAPPI" = "$(cat "$HOME/.pi/agent/extensions/agentbar.ts")" ]'
 
 echo "---"
 echo "$pass passed, $fail failed"

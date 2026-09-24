@@ -433,6 +433,15 @@ check "opencode: plugin parses"     '"$NODE" --input-type=module --check < Scrip
 check "opencode: error not done"    'grep -q "state: \"error\"" Scripts/hooks/opencode/agentbar.js'
 check "opencode: retires finished"  'grep -q "retireLater" Scripts/hooks/opencode/agentbar.js'
 
+# 20a. Pi extension is loadable and maps the bus to protocol states
+fresh_home
+cp Scripts/hooks/pi/agentbar.ts "$HOME/agentbar.mjs"
+check "pi: extension parses"        '"$NODE" --input-type=module --check < "$HOME/agentbar.mjs"'
+check "pi: observe-only"            'grep -q "never returns { block: true }" Scripts/hooks/pi/agentbar.ts'
+check "pi: error not done"          'grep -q "state: \"error\"" Scripts/hooks/pi/agentbar.ts'
+check "pi: shutdown removes"        'grep -q "session_shutdown" Scripts/hooks/pi/agentbar.ts'
+check "pi: event bus → state.d"     '"$NODE" Scripts/test/pi-extension-test.mjs "$HOME/agentbar.mjs"'
+
 # 21. update.js must never park on a stdin that has no EOF — its whole job runs
 # in the stdin handler, so without a self-timeout a stalled pipe froze the tool
 # call until Claude Code's 60s hook timeout.

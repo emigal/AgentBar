@@ -6,6 +6,7 @@ transparent PNG frame sets (plus preview GIFs and System-mode simulations).
 ```bash
 swift generate-codex-antigravity.swift <outDir> ../../Sources/AgentBar/Sprites/LogoAssets.swift
 swift generate-copilot.swift    # writes to ./final
+swift generate-pi-mark.swift <out.png>   # geometric π → Sources/AgentBar/Sprites/PiMark.swift
 ```
 
 Frames land in `<outDir>/frames/<agent>/f*.png`. To ship them, base64 each

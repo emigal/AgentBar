@@ -41,6 +41,7 @@ enum HookInstaller {
             _ = step("antigravity", installAntigravity)
             _ = step("qwen", installQwen)
             _ = step("opencode", installOpenCode)
+            _ = step("pi", installPi)
             DispatchQueue.main.async { onFinish?() }
         }
     }
@@ -373,6 +374,34 @@ enum HookInstaller {
         let data = try Data(contentsOf: src)
         try writeIfChanged(data, to: dest)
         note("opencode")
+    }
+
+    // MARK: - Pi (~/.pi/agent/extensions/agentbar.ts)
+
+    /// Pi auto-discovers TypeScript extensions from its agent dir. The copy
+    /// refreshes with the app version. Honor PI_CODING_AGENT_DIR when the app
+    /// actually inherited it; the default ~/.pi is the usual case (open(1)
+    /// won't see a shell export).
+    private static func installPi() throws {
+        var dirs: [URL] = []
+        if let env = ProcessInfo.processInfo.environment["PI_CODING_AGENT_DIR"], !env.isEmpty {
+            let u = URL(fileURLWithPath: (env as NSString).expandingTildeInPath)
+            if FileManager.default.fileExists(atPath: u.path) { dirs.append(u) }
+        }
+        if FileManager.default.fileExists(atPath: home.appendingPathComponent(".pi").path) {
+            dirs.append(home.appendingPathComponent(".pi/agent"))
+        }
+        var seen = Set<String>()
+        dirs = dirs.filter { seen.insert($0.resolvingSymlinksInPath().path).inserted }
+        guard !dirs.isEmpty else { return } // not a Pi user
+        let src = hooksDir.appendingPathComponent("pi/agentbar.ts")
+        let data = try Data(contentsOf: src)
+        for agentDir in dirs {
+            let extDir = agentDir.appendingPathComponent("extensions", isDirectory: true)
+            try FileManager.default.createDirectory(at: extDir, withIntermediateDirectories: true)
+            try writeIfChanged(data, to: extDir.appendingPathComponent("agentbar.ts"))
+            note("pi")
+        }
     }
 
     // MARK: - Gemini CLI (~/.gemini/settings.json)

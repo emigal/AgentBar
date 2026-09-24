@@ -78,6 +78,13 @@ struct Agent {
               artwork: .appIconMark(opencodeMarkPNG),
               open: .terminal,
               approveKeys: nil),
+        // Hook-driven live status: Pi loads a TS extension from
+        // ~/.pi/agent/extensions/.
+        Agent(id: "pi", name: "Pi",
+              brand: NSColor(srgbRed: 0, green: 0.843, blue: 1, alpha: 1), // #00D7FF — Pi cyan
+              artwork: .tintedMark(piMarkPNG),
+              open: .terminal,
+              approveKeys: nil),
         // Cloud-only: rows come from the external poller (Scripts/cloud), never hooks.
         Agent(id: "devin", name: "Devin",
               brand: NSColor(srgbRed: 0.169, green: 0.502, blue: 1.0, alpha: 1), // #2B80FF

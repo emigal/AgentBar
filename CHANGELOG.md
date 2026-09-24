@@ -18,6 +18,11 @@ All notable changes to AgentBar are documented here. This project follows
   tab like they do in iTerm2, Terminal.app, and WezTerm. Sessions in a Herdr
   pane select the tab hosting the Herdr client, in every terminal — the agent's
   own pty belongs to the Herdr server and never matched a tab before.
+- **Pi.** Mario Zechner's coding agent now shows up in the bar. AgentBar drops
+  an observe-only TypeScript extension into `~/.pi/agent/extensions/` (and
+  `PI_CODING_AGENT_DIR` when the process can see it) that mirrors session start,
+  thinking, tool use, done, and provider errors into `state.d`. Auto-installed
+  when `~/.pi` is present. Original mark is a geometric π, tinted Pi cyan.
 - **Claude Cowork tab sessions show up.** Newer desktop builds run Cowork in
   the cloud / a VM (`cse_01*` / `session_01*` / `rcw-*`) that never writes
   `audit.jsonl` on the host. `CoworkWatcher` follows `[remote-bash]` /

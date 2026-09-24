@@ -4,7 +4,7 @@ Context for AI coding assistants working on this repository.
 
 ## Project
 AgentBar is a native macOS status app (Swift, AppKit, SPM) showing live status of
-AI coding agents (Claude Code, Codex, Cursor, Gemini, Copilot, Antigravity). Node.js hook scripts in
+AI coding agents (Claude Code, Codex, Cursor, Gemini, Copilot, Antigravity, Pi). Node.js hook scripts in
 `Scripts/hooks/` write per-session JSON to `~/.agentbar/state.d/`; the app watches
 that folder. It presents itself as a menu bar item, a Dynamic Island panel under the
 notch, or both — the user picks in the welcome window. State file protocol (normative):
