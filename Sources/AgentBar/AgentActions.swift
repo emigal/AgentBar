@@ -73,11 +73,7 @@ enum AgentActions {
            let r = requests.first(where: { $0.sessionId == s.id }) {
             reportFailedAnswer(AnswerWriter.write(behavior: "defer", for: r))
         }
-        switch s.entrypoint {
-        case "claude-desktop":   open(Agent.byID("claude"))
-        case "antigravity-app":  open(Agent.byID("antigravity"))
-        default:                 TerminalFocus.focus(session: s)
-        }
+        openWhereItLives(s)
     }
 
     /// Allow / Always / Deny / defer from an inline button strip. False means the
@@ -92,17 +88,13 @@ enum AgentActions {
         if a.request.isPlanRequest, a.behavior == "allow" || a.behavior == "always" {
             // Typing "2" is only safe when the session's OWN tab is the one in
             // front. A desktop session keeps its dialog inside the Claude app,
-            // and Warp/Ghostty/kitty expose no tab targeting — in both cases
+            // and Warp/kitty expose no tab targeting — in both cases
             // hand over rather than type blind into whatever is frontmost.
-            guard a.session.entrypoint != "claude-desktop",
+            guard !a.session.hostedInApp,
                   TerminalFocus.canTargetTab(termProgram: a.session.termProgram) else {
                 guard reportFailedAnswer(AnswerWriter.write(behavior: "defer", for: a.request))
                 else { return false }
-                if a.session.entrypoint == "claude-desktop" {
-                    open(Agent.byID(a.session.agentID))
-                } else {
-                    TerminalFocus.focus(session: a.session)
-                }
+                openWhereItLives(a.session)
                 return true
             }
             guard KeystrokeApprover.trusted else {
@@ -134,11 +126,7 @@ enum AgentActions {
             guard reportFailedAnswer(AnswerWriter.write(behavior: "defer", for: a.request)) else { return false }
             // The prompt is about to reappear where the session lives: bring it
             // forward — the exact tab when the terminal can be asked for it.
-            if a.session.entrypoint == "claude-desktop" {
-                open(Agent.byID(a.session.agentID))
-            } else {
-                TerminalFocus.focus(session: a.session)
-            }
+            openWhereItLives(a.session)
             return true
         default:
             return ack(reportFailedAnswer(AnswerWriter.write(behavior: a.behavior, for: a.request)))
@@ -181,12 +169,41 @@ enum AgentActions {
         case "grant":
             KeystrokeApprover.requestAccess()
         default: // "open" — jump to the prompt and answer there
-            if session.entrypoint == "antigravity-app" {
-                open(Agent.byID(session.agentID))
-            } else {
-                TerminalFocus.focus(session: session)
-            }
+            openWhereItLives(session)
         }
+    }
+
+    /// A writer-stamped `url` (cloud poller, Cowork `claude://claude.ai/cowork/cse_…`)
+    /// is the session's real address — open it. Cowork rows written before the
+    /// watcher stamped a url still jump by session id, not by "whatever tab is
+    /// already focused". Otherwise the hosted app or the terminal, same as before.
+    private static func openWhereItLives(_ s: Session) {
+        if let url = jumpURL(for: s) {
+            NSWorkspace.shared.open(url)
+            return
+        }
+        if s.hostedInApp {
+            open(Agent.byID(s.agentID))
+        } else {
+            TerminalFocus.focus(session: s)
+        }
+    }
+
+    /// Writer-stamped `url`, or a Cowork / local-session deep link derived from
+    /// the id when an older row never got one.
+    private static func jumpURL(for s: Session) -> URL? {
+        if let url = URL(string: s.url), url.scheme != nil { return url }
+        guard s.entrypoint == "claude-desktop" else { return nil }
+        let id = s.id
+        let low = id.lowercased()
+        if low.hasPrefix("local_") {
+            return URL(string: "claude://claude.ai/local_sessions/\(id)")
+        }
+        var thread = id
+        if low.hasPrefix("rcw-") { thread = "cse_" + id.dropFirst(4) }
+        else if low.hasPrefix("session_") { thread = "cse_" + id.dropFirst("session_".count) }
+        else if !low.hasPrefix("cse_") { return nil }
+        return URL(string: "claude://claude.ai/cowork/\(thread)")
     }
 
     private static func openApp(named name: String) {

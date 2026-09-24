@@ -410,7 +410,8 @@ enum MenuBuilder {
             }
 
             let buttons = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-            let deferTitle = s.entrypoint == "claude-desktop" ? "⧉ Claude app" : "⌨ Terminal"
+            let deferTitle = s.hostedInApp
+                ? "⧉ \(Agent.byID(s.agentID).name)" : "⌨ Terminal"
             let onChoose: (String) -> Void = { [weak controller] behavior in
                 controller?.answer(ApprovalAction(request: r, behavior: behavior, session: s))
             }
@@ -487,7 +488,7 @@ enum MenuBuilder {
             // open, so complex calls answer on the island — or wherever the
             // session's own wizard lives when there is no island to point at.
             let surface = Presentation.current.showsIsland ? "answer on the island"
-                : (s.entrypoint == "claude-desktop" ? "answer in Claude" : "answer in the terminal")
+                : (s.hostedInApp ? "answer in \(Agent.byID(s.agentID).name)" : "answer in the terminal")
             hint.attributedTitle = NSAttributedString(
                 string: "      \(qs.count > 1 ? "\(qs.count) questions" : "Pick several") — \(surface)",
                 attributes: [.font: NSFont.menuFont(ofSize: 11),
@@ -497,8 +498,8 @@ enum MenuBuilder {
 
         // The wizard is already on the terminal's screen; this just retires the
         // card here and takes the user to it.
-        let escape = NSMenuItem(title: s.entrypoint == "claude-desktop"
-                                ? "      ⧉ Answer in Claude" : "      ⌨ Answer in terminal",
+        let escape = NSMenuItem(title: s.hostedInApp
+                                ? "      ⧉ Answer in \(Agent.byID(s.agentID).name)" : "      ⌨ Answer in terminal",
                                 action: #selector(StatusItemController.sessionRowClicked(_:)),
                                 keyEquivalent: "")
         escape.target = controller
@@ -666,7 +667,7 @@ enum MenuBuilder {
     private static func addKeystrokeApproval(to menu: NSMenu, for s: Session,
                                              controller: StatusItemController) {
         let agent = Agent.byID(s.agentID)
-        let target = s.entrypoint == "antigravity-app" ? "⧉ \(agent.name)" : "⌨ Terminal"
+        let target = s.hostedInApp ? "⧉ \(agent.name)" : "⌨ Terminal"
         let specs: [(title: String, behavior: String, toolTip: String?)] =
             KeystrokeApprover.trusted
             ? [("✓ Allow", "allow",
@@ -696,7 +697,7 @@ enum MenuBuilder {
         note.isEnabled = false
         menu.addItem(note)
         if agent.approveKeys != nil {
-            let target = s.entrypoint == "antigravity-app" ? agent.name : "terminal"
+            let target = s.hostedInApp ? agent.name : "terminal"
             let title = KeystrokeApprover.trusted
                 ? "Approve in \(target) (sends keystroke)" : "Grant Accessibility…"
             let item = NSMenuItem(title: title,
@@ -706,9 +707,8 @@ enum MenuBuilder {
             item.representedObject = s
             menu.addItem(item)
         }
-        // App-hosted sessions (Cowork) answer the prompt in the app, not a terminal.
-        let hostedInApp = s.entrypoint == "claude-desktop" || s.entrypoint == "antigravity-app"
-        let open = NSMenuItem(title: hostedInApp ? "Answer in \(agent.name)" : "Open in terminal",
+        // App-hosted sessions (Cowork, Cursor IDE, Antigravity) answer in the app, not a terminal.
+        let open = NSMenuItem(title: s.hostedInApp ? "Answer in \(agent.name)" : "Open in terminal",
                               action: #selector(StatusItemController.sessionRowClicked(_:)),
                               keyEquivalent: "")
         open.target = controller

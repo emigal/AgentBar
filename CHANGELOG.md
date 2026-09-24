@@ -18,6 +18,16 @@ All notable changes to AgentBar are documented here. This project follows
   tab like they do in iTerm2, Terminal.app, and WezTerm. Sessions in a Herdr
   pane select the tab hosting the Herdr client, in every terminal — the agent's
   own pty belongs to the Herdr server and never matched a tab before.
+- **Claude Cowork tab sessions show up.** Newer desktop builds run Cowork in
+  the cloud / a VM (`cse_01*` / `session_01*` / `rcw-*`) that never writes
+  `audit.jsonl` on the host. `CoworkWatcher` follows `[remote-bash]` /
+  `vmOneShot` in the desktop logs when the VM runs a tool, and IndexedDB
+  `chat-draft:` writes for a live composer. Folder grants in
+  `remote-session-spaces.json` are used when present, not required.
+  Reconnect failures in `claude.ai-web.log` are ignored — they are not
+  liveness. Working while the turn is live; the row is dropped after 90s of
+  silence so a click can't reopen a VM that's already gone. Permission
+  prompts stay inside the sandbox. Older local-mode sessions are unchanged.
 
 ### Fixed
 - **Connected Herdr machines open in the existing window, instantly.** A
@@ -33,6 +43,21 @@ All notable changes to AgentBar are documented here. This project follows
   with a beep if the target cannot be verified. Herdr 0.9's separate client
   tab selection is also updated explicitly, and named sessions cannot
   receive default-session pane IDs.
+- **Cowork menu clicks open the right thread.** A row click used to just
+  foreground Claude.app, so you always landed on whatever Cowork tab was
+  already up. Cowork-tab rows now carry `claude://claude.ai/cowork/cse_01…`
+  and the click opens that session.
+- **Dead Cowork tabs are not shown as live.** Reconnect errors
+  (`sign_for_session_header_failed`, MCP 400s) were scraped as activity, so
+  expired VMs sat in the menu as thinking and a click asked Claude to
+  reconnect them ("Lost connection to the remote session"). Only a tool call
+  or a live composer draft counts; quiet tab rows are removed.
+- **Cursor IDE sessions open in Cursor.** Clicking a local Cursor agent in the
+  menu (or island) used to bring Terminal.app forward — the hook stamped
+  `entrypoint: "cli"` even when the session lived in the Agents window, and an
+  empty `TERM_PROGRAM` maps to Terminal. The hook now tags IDE sessions as
+  `cursor-app`; row clicks (and Open ▸ Cursor) focus Cursor. Cursor CLI in a
+  real terminal still opens that terminal.
 
 ## 1.12.0 - 2026-08-18
 

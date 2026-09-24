@@ -367,7 +367,8 @@ final class IslandController: NSObject {
 
     private func deferTitle(for s: Session, plan: Bool = false) -> String {
         let verb = plan ? "Review" : "Answer"
-        return s.entrypoint == "claude-desktop" ? "\(verb) in Claude" : "\(verb) in terminal"
+        return s.hostedInApp
+            ? "\(verb) in \(Agent.byID(s.agentID).name)" : "\(verb) in terminal"
     }
 
     /// One approval card per request, cached for the request's lifetime: the

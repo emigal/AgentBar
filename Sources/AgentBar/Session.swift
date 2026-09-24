@@ -20,7 +20,7 @@ struct Session {
     let label: String
     let project: String
     let cwd: String
-    let entrypoint: String   // "cli", "claude-desktop", …
+    let entrypoint: String   // "cli", "claude-desktop", "cursor-app", …
     let termProgram: String  // TERM_PROGRAM of the hosting terminal, for row clicks
     let pid: Int32           // the agent process; used for liveness pruning
     let started: Bool        // false until the session has real activity
@@ -120,6 +120,20 @@ struct Session {
         herdrHost = ""
         herdrRemotePane = ""
         decayed = false
+    }
+
+    /// Row click should focus the agent's own app, not a terminal.
+    var hostedInApp: Bool {
+        switch entrypoint {
+        case "claude-desktop", "antigravity-app", "cursor-app":
+            return true
+        case "cloud":
+            return false
+        default:
+            // Cursor IDE hooks used to stamp "cli" with no TERM_PROGRAM; an empty
+            // term is the app (Agents window / editor), not Terminal.app.
+            return agentID == "cursor" && termProgram.isEmpty
+        }
     }
 
     /// Current git branch of the session's project, read straight from `.git/HEAD`

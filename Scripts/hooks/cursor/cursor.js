@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// AgentBar bridge for Cursor CLI hooks. Maps Cursor's hook events (read from the
-// stdin payload's hook_event_name) to a per-session state file in
-// ~/.agentbar/state.d/, the same "folder is the protocol" the app already watches.
-// Observe-only: writes state, emits nothing, exits fast — never affects the agent.
+// AgentBar bridge for Cursor hooks (IDE / Agents window + `agent` CLI). Maps
+// Cursor's hook events (read from the stdin payload's hook_event_name) to a
+// per-session state file in ~/.agentbar/state.d/, the same "folder is the
+// protocol" the app already watches. Observe-only: writes state, emits nothing,
+// exits fast — never affects the agent.
 const fs = require("fs"), os = require("os"), path = require("path"), cp = require("child_process");
 
 const AGENT = "cursor";
@@ -31,6 +32,20 @@ const running = () => {
 };
 const writeAtomic = (f, o) => { const t = f + "." + process.pid + ".tmp"; fs.writeFileSync(t, JSON.stringify(o)); fs.renameSync(t, f); };
 
+let _isApp;
+const isApp = () => {
+  if (_isApp === undefined) {
+    let cmd = "";
+    try { cmd = cp.execFileSync("ps", ["-o", "comm=", "-p", String(process.ppid)], { encoding: "utf8" }); } catch {}
+    // Cursor.app and its helpers (extension-host, Agents Window, …). The CLI
+    // (`agent` / `cursor-agent`) is a different binary and does not match.
+    // TERM_PROGRAM can't be trusted: a GUI-launched Cursor inherits it when
+    // started via `open` from a terminal.
+    _isApp = /Cursor Helper|^Cursor$/.test(cmd);
+  }
+  return _isApp;
+};
+
 // One diagnostic per process, never more: this bridge fires on every event, so an
 // unconditional log would flood the host agent's stderr. Self-swallowing and
 // stderr-only — it can neither throw nor delay the exit.
@@ -55,7 +70,6 @@ function run() {
   if (!state) return process.exit(0);
 
   const id = j.conversation_id || j.generation_id || j.session_id || "";
-  const cwd = j.cwd || (Array.isArray(j.workspace_roots) && j.workspace_roots[0]) || "";
   const statePath = path.join(stateDir, safeId(id) + ".json");
 
   try { fs.mkdirSync(stateDir, { recursive: true }); } catch (e) { warn("mkdir " + stateDir, e); }
@@ -75,6 +89,7 @@ function run() {
   }
 
   let prev = {}; try { prev = JSON.parse(fs.readFileSync(statePath, "utf8")); } catch {}
+  const cwd = j.cwd || (Array.isArray(j.workspace_roots) && j.workspace_roots[0]) || prev.cwd || "";
   const ts = Math.floor(Date.now() / 1000);
   const oneLine = (s) => String(s).replace(/\s+/g, " ").trim().slice(0, 120);
   try {
@@ -82,7 +97,9 @@ function run() {
       ...prev, agent: AGENT, state,
       label: j.tool_name ? String(j.tool_name) : (state === "done" ? "Done" : ""),
       project: cwd ? path.basename(cwd) : "", cwd, sessionId: id,
-      entrypoint: "cli", term_program: process.env.TERM_PROGRAM || "",
+      // Desktop sessions come from Cursor.app; CLI sessions from `agent`.
+      entrypoint: isApp() ? "cursor-app" : "cli",
+      term_program: isApp() ? "" : (process.env.TERM_PROGRAM || ""),
       // Cursor execs the script directly, so ppid is the agent process (liveness handle).
       pid: process.ppid, started: state !== "idle" ? true : (prev.started || false),
       started_at: prev.started_at || ts, // set once; elapsed depends on it never moving

@@ -19,7 +19,7 @@
 </p>
 
 AgentBar is a lightweight, native macOS app that shows the live state of your
-AI coding sessions — Claude Code and Claude Cowork, Codex, Cursor CLI, Gemini CLI,
+AI coding sessions — Claude Code and Claude Cowork, Codex, Cursor, Gemini CLI,
 Qwen Code, OpenCode, plus GitHub Copilot and Google Antigravity in one place. Each agent gets its own mark built from its
 real identity — Clawd the crab for Claude, the OpenAI knot with a braille dot-matrix
 for Codex, the official pixel-art head for Copilot, the pixel rainbow arch for
@@ -228,9 +228,9 @@ rm -f ~/.config/opencode/plugins/agentbar.js
 | Agent | Live status | Open | Mascot | Notes |
 |---|---|---|---|---|
 | Claude Code (CLI + desktop) | full | yes | Clawd the crab | hooks: prompt, tool, permission, stop, lifecycle |
-| Claude Cowork (desktop) | working / approval / question / done — **older local mode only** | yes | Clawd the crab | watched, not hooked: Cowork gives each session a throwaway config dir, so there is nothing to install into. `CoworkWatcher` reads the audit log the app writes per session. **Newer desktop builds run Cowork inside a VM that writes no session files on the host — those sessions can't be shown until the app exposes something host-side** |
+| Claude Cowork (desktop) | working (Cowork tab, live turn only); working / approval / question / done (older local mode) | yes | Clawd the crab | watched, not hooked: Cowork gives each session a throwaway config dir, so there is nothing to install into. Local-mode sessions are read from `audit.jsonl`. Cowork-tab sessions are matched from `[remote-bash] user=rcw-…` / `vmOneShot` when the VM runs a tool, and from renderer `chat-draft:` writes — reconnect errors in the web log are ignored. Folder grants in `remote-session-spaces.json` are optional. No per-tool or permission granularity for tab sessions |
 | Codex CLI | turn-complete | yes | knot + braille dot-matrix | via Codex `notify` (auto-installed); no per-tool granularity upstream |
-| Cursor CLI | working / done | yes | pointer | hooks in `~/.cursor/hooks.json` (auto-wired if Cursor is installed) |
+| Cursor (CLI + app) | working / done | yes | pointer | hooks in `~/.cursor/hooks.json` (auto-wired if Cursor is installed); IDE/Agents-window rows open Cursor, CLI rows open the terminal |
 | Gemini CLI | working / done | yes | spark | hooks in `~/.gemini/settings.json` (auto-wired if Gemini is installed) |
 | GitHub Copilot | — | yes | pixel head + dot-matrix | no public event API yet; everything else is wired and waiting |
 | Qwen Code | working / done / failed | yes | Q ring | Claude-style hooks in `~/.qwen/settings.json` (auto-wired if Qwen is installed); remote approval waits until its decision contract is verified |
@@ -323,10 +323,10 @@ writes `requests.d/`, the app answers into `answers.d/`.
 - **No sessions appear** — hooks load when a session starts: open a *new* agent
   session after installing. If you use a custom `CLAUDE_CONFIG_DIR`, see
   [issue #4](https://github.com/michalstrnadel/AgentBar/issues/4).
-- **Cowork sessions don't appear** — newer Claude desktop builds run Cowork inside
-  an isolated VM: the session's audit log lives on the VM's disk image, so nothing
-  exists on the host for AgentBar to read. Upstream limitation; sessions from the
-  older host-side "local mode" still show.
+- **Cowork tab sessions don't appear** — the watcher needs Claude.app running
+  (it stamps that pid on every row). Tab rows only show while a turn is live
+  (tool call or composer). Chat-only tabs stay generic "Cowork session" until
+  you grant a folder. Older local-mode sessions still come from `audit.jsonl`.
 - **Still nothing** — the installer needs `node`; if none is found the Claude hooks
   are skipped (logged to Console.app). Install Node.js and relaunch AgentBar.
 - **Codex rows never show** — if `~/.codex/config.toml` already had a `notify`

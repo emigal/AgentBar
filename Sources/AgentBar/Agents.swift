@@ -59,7 +59,7 @@ struct Agent {
         Agent(id: "cursor", name: "Cursor",
               brand: .labelColor, // Cursor's brand is monochrome; adapt to menu appearance
               artwork: .appIconMark(cursorLogoPNG),
-              open: .terminal,
+              open: .appNamed("Cursor"),
               approveKeys: nil),
         Agent(id: "gemini", name: "Gemini",
               brand: NSColor(srgbRed: 0.102, green: 0.502, blue: 0.992, alpha: 1), // #1A80FD — CLI icon blue

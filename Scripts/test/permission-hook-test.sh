@@ -24,7 +24,14 @@ fresh_home() {
 # Bounded poll for the request file instead of a fixed sleep; sets $REQ.
 wait_req() {
   for _ in $(seq 50); do
-    REQ="$(ls "$HOME/.agentbar/requests.d/" 2>/dev/null | head -1)"
+    # Atomic writers briefly publish a .tmp sibling before the final rename.
+    # Only the completed .json file is a request the test can answer.
+    REQ=""
+    for request_path in "$HOME/.agentbar/requests.d/"*.json; do
+      [ -f "$request_path" ] || continue
+      REQ="${request_path##*/}"
+      break
+    done
     [ -n "$REQ" ] && return 0
     sleep 0.1
   done

@@ -36,8 +36,9 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
   "project": "AgentBar",       // basename of cwd ("" ok)
   "cwd": "/path/to/project",
   "sessionId": "abc-123",
-  "entrypoint": "cli",         // "cli" | "claude-desktop" | "antigravity-app" | "cloud" | "" — which surface hosts it
+  "entrypoint": "cli",         // "cli" | "claude-desktop" | "antigravity-app" | "cursor-app" | "cloud" | "" — which surface hosts it
                                // "claude-desktop" also covers Cowork: the row opens the app, not a terminal
+                               // "cursor-app" = Cursor IDE / Agents window: the row opens Cursor, not a terminal
                                // "cloud" = the session runs on a vendor's infrastructure; the row opens `url`
   "term_program": "WarpTerminal", // $TERM_PROGRAM of the hosting terminal ("" ok)
   "pid": 12345,                // the agent process (hook's ppid) — liveness handle
@@ -53,6 +54,9 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
                                // OPTIONAL: where the session lives when it isn't local.
                                // Required for entrypoint "cloud": a row click opens it
                                // (https:// or a vendor scheme like cursor://).
+                               // Cowork-tab rows use claude://claude.ai/cowork/cse_01… so a
+                               // click opens that thread in Claude.app, not whichever
+                               // tab was last focused.
   "herdr_pane": "w13:pE",      // OPTIONAL: local Herdr pane id hosting (or, via the
                                // herdr-mirror plugin, mirroring) the session — a
                                // frontend may select it on a row click
@@ -200,7 +204,11 @@ An agent with no usable hook mechanism can still be covered by a **watcher** in
 the frontend that upserts `state.d` files itself — same schema, same pruning
 rules. AgentBar does this for Antigravity (sparse hooks) and for Claude Cowork,
 which hands every session a throwaway config directory so there is nothing to
-install into. A watcher MUST leave newer hook writes alone and SHOULD stamp a
+install into (older local-mode sessions are read from `audit.jsonl`; Cowork-tab
+sessions from host tool-call logs / renderer `chat-draft:` writes, with
+`remote-session-spaces.json` supplying folder names when the tab has granted
+any — reconnect errors in the web log are not a session).
+A watcher MUST leave newer hook writes alone and SHOULD stamp a
 `pid` that dies with the session, so the normal pruning rules clean up after it.
 
 Sessions that run on a vendor's infrastructure (cloud agents) are the same

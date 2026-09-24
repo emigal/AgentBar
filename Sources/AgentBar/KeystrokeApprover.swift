@@ -26,9 +26,9 @@ enum KeystrokeApprover {
 
     static func approve(session: Session, keys: [CGKeyCode]) {
         let target: String
-        if session.entrypoint == "antigravity-app" {
-            // Desktop Antigravity sessions live in the app, not a terminal.
-            target = "Antigravity"
+        if session.hostedInApp {
+            // Desktop sessions live in the agent's own app, not a terminal.
+            target = Agent.byID(session.agentID).name
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             p.arguments = ["-a", target]

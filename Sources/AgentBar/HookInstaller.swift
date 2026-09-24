@@ -219,7 +219,7 @@ enum HookInstaller {
         note("codex")
     }
 
-    // MARK: - Cursor CLI (~/.cursor/hooks.json)
+    // MARK: - Cursor (~/.cursor/hooks.json)
 
     private static func installCursor() throws {
         // ~/.cursor also exists for IDE-only users; that's intentional — the same

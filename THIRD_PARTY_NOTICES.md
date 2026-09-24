@@ -13,7 +13,7 @@ property of their respective owners.
 - **Google Antigravity logo** — trademark of Google LLC. The animated Antigravity mark
   is a faithful pixel-by-pixel reproduction of the official pixel rainbow arch; static
   vector sourced from svgl.app.
-- **Cursor logo** — trademark of Anysphere Inc. Shown for Cursor CLI sessions as the
+- **Cursor logo** — trademark of Anysphere Inc. Shown for Cursor sessions as the
   official cube app icon (sourced from cursor.com), used nominatively to identify the tool.
 - **Google Gemini CLI logo** — trademark of Google LLC. Shown for Gemini CLI sessions as
   the official gradient "&gt;" app icon (sourced from geminicli.com), used nominatively

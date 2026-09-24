@@ -479,8 +479,8 @@ final class IslandRowView: NSView {
             out.append(chip("Cloud", tint: .white))
         } else if s.entrypoint == "claude-desktop" {
             out.append(chip("Desktop", tint: .white))
-        } else if s.entrypoint == "antigravity-app" {
-            out.append(chip(agent.name == "Antigravity" ? "App" : agent.name, tint: .white))
+        } else if s.hostedInApp {
+            out.append(chip("App", tint: .white))
         } else if let term = TerminalApp.known.first(where: { $0.termProgram == s.termProgram }) {
             out.append(chip(term.name, tint: .white))
         }
