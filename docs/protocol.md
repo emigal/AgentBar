@@ -59,7 +59,8 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
                                // tab was last focused.
   "via": "Omnigent",           // OPTIONAL: the surface a cloud row runs through when it
                                // isn't the agent's own vendor (an Omnigent server running
-                               // Claude Code) — frontends name it where they'd say "Cloud"
+                               // Claude Code), or "Project" for a Cursor Project row —
+                               // frontends name it where they'd say "Cloud"
   "herdr_pane": "w13:pE",      // OPTIONAL: local Herdr pane id hosting (or, via the
                                // herdr-mirror plugin, mirroring) the session — a
                                // frontend may select it on a row click

@@ -144,6 +144,123 @@ test("cursor: v0 shape (status on the agent, no runs) still normalizes", () => {
   assert.equal(rows[0].state, "done");
 });
 
+// --- cursor Projects: composer shapes from a live ListBackgroundComposers (2026-09-27)
+
+const PROJ = "bc-dd91d66d-7c84-4ec4-ac9c-3c7acd7b3639";
+const projectFixture = (coordRun, extra = {}) => ({
+  agents: [
+    { id: PROJ, name: "Eldar Data Uploads", status: "ACTIVE", latestRunId: "run-c", createdAt: iso(86400 * 16) },
+    { id: "bc-w1", name: "Normalize lab values and units", status: "ACTIVE", latestRunId: "run-w1", createdAt: iso(900) },
+    { id: "bc-w2", name: "n40 genome repo docs", status: "ACTIVE", latestRunId: "run-w2", createdAt: iso(7200) },
+    { id: "bc-orphan", name: "Refresh pickable M4 tickets", status: "ACTIVE", latestRunId: "run-o", createdAt: iso(600) },
+    { id: "bc-solo", name: "Moontower data source linking", status: "ACTIVE", latestRunId: "run-s", createdAt: iso(300) },
+  ],
+  runs: {
+    [PROJ]: coordRun,
+    "bc-w1": { id: "run-w1", status: "RUNNING", createdAt: iso(900), updatedAt: iso(20) },
+    "bc-w2": { id: "run-w2", status: "FINISHED", createdAt: iso(7200), updatedAt: iso(3000),
+               git: { branches: [{ prUrl: "https://github.com/x/y/pull/42" }] } },
+    "bc-orphan": { id: "run-o", status: "RUNNING", createdAt: iso(600), updatedAt: iso(30) },
+    "bc-solo": { id: "run-s", status: "RUNNING", createdAt: iso(300), updatedAt: iso(5) },
+  },
+  composers: [
+    { id: PROJ, name: "Eldar Data Uploads", manager: "", isProject: true, archived: false },
+    { id: "bc-w1", manager: PROJ, isProject: false, archived: false },
+    { id: "bc-w2", manager: PROJ, isProject: false, archived: false },
+    { id: "bc-orphan", manager: "bc-archived-mgr", isProject: false, archived: false },
+    { id: "bc-archived-mgr", name: "BQ Migration dag", manager: "", isProject: false, archived: true },
+  ],
+  projectsError: "",
+  ...extra,
+});
+const idleCoord = { id: "run-c", status: "FINISHED", createdAt: iso(4000), updatedAt: iso(3500) };
+
+test("cursor projects: an idle coordinator with a working agent reads as working, opens the Project", () => {
+  const { rows, warnings } = cursor.normalize(projectFixture(idleCoord), DEFAULTS.cursor, NOW);
+  assert.deepEqual(rows.map((r) => r.id).sort(), [PROJ, "bc-orphan", "bc-solo"].sort());
+  const p = rows.find((r) => r.id === PROJ);
+  assert.equal(p.state, "thinking");
+  assert.equal(p.via, "Project");
+  assert.equal(p.label, "1 agent working");
+  assert.equal(p.project, "Eldar Data Uploads");
+  assert.equal(p.prompt, "Normalize lab values and units");
+  assert.equal(p.url, `cursor://anysphere.cursor-deeplink/background-agent?bcId=${PROJ}`);
+  assert.equal(p.started_at, NOW - 900); // the work in flight, not the Project's creation
+  assert.equal(p.updated_at, NOW - 20);
+  assert.equal(rows.find((r) => r.id === "bc-orphan").via, undefined); // archived manager: own row
+  assert.deepEqual(warnings, []);
+});
+
+test("cursor projects: coordinator and agents both busy; all idle falls back to the coordinator", () => {
+  const busy = { id: "run-c", status: "RUNNING", createdAt: iso(60), updatedAt: iso(1) };
+  let p = cursor.normalize(projectFixture(busy), DEFAULTS.cursor, NOW).rows.find((r) => r.id === PROJ);
+  assert.equal(p.label, "Coordinating · 1 agent");
+  assert.equal(p.started_at, NOW - 900);
+
+  const quiet = projectFixture(idleCoord);
+  quiet.runs["bc-w1"] = { id: "run-w1", status: "FINISHED", createdAt: iso(900), updatedAt: iso(3400) };
+  p = cursor.normalize(quiet, DEFAULTS.cursor, NOW).rows.find((r) => r.id === PROJ);
+  assert.equal(p.state, "done");
+  assert.equal(p.label, "Ready for review");
+  assert.equal(p.prompt, "Eldar Data Uploads");
+  assert.equal(p.updated_at, NOW - 3000);
+  assert.equal(p.recap, "https://github.com/x/y/pull/42"); // latest finished agent's PR
+});
+
+test("cursor projects: a coordinator missing from the public listing is built from Cursor's own", () => {
+  const raw = projectFixture(idleCoord);
+  raw.agents = raw.agents.filter((a) => a.id !== PROJ);
+  raw.composers[0] = { ...raw.composers[0], status: "BACKGROUND_COMPOSER_STATUS_FINISHED",
+                       createdAt: String((NOW - 86400) * 1000), updatedAt: String((NOW - 4000) * 1000) };
+  const p = cursor.normalize(raw, { ...DEFAULTS.cursor, openIn: "web" }, NOW).rows.find((r) => r.id === PROJ);
+  assert.equal(p.state, "thinking");
+  assert.equal(p.project, "Eldar Data Uploads");
+  assert.equal(p.url, `https://cursor.com/agents/${PROJ}`);
+});
+
+test("cursor projects: without Cursor's listing, agents stay ungrouped and one warning says why", () => {
+  const raw = projectFixture(idleCoord, { composers: null, projectsError: "no Cursor.app login — Projects show as separate agents" });
+  const { rows, warnings } = cursor.normalize(raw, DEFAULTS.cursor, NOW);
+  assert.equal(rows.length, 5);
+  assert.ok(rows.every((r) => r.via === undefined));
+  assert.equal(rows.find((r) => r.id === PROJ).state, "done");
+  assert.deepEqual(warnings, [raw.projectsError]);
+});
+
+test("cursor projects: a new Project with no agents yet still gets the Project chip", () => {
+  const raw = projectFixture(idleCoord);
+  raw.composers = raw.composers.filter((c) => c.manager !== PROJ);
+  const p = cursor.normalize(raw, DEFAULTS.cursor, NOW).rows.find((r) => r.id === PROJ);
+  assert.equal(p.via, "Project");
+  assert.equal(p.state, "done");
+});
+
+test("cursor projects: no login is a warning; a failed lookup keeps the last good grouping for a while", async () => {
+  const none = await cursor.fetchProjects({ sessionToken: async () => "" }, { composers: null, at: 0 });
+  assert.equal(none.composers, null);
+  assert.match(none.error, /no Cursor\.app login/);
+
+  const cache = { composers: null, at: 0 };
+  let fail = false;
+  const io = {
+    sessionToken: async () => "tok",
+    listComposers: async (t) => {
+      assert.equal(t, "tok");
+      if (fail) throw new Error("HTTP 503");
+      return [{ bcId: "bc-w1", managerAgentId: PROJ, status: "BACKGROUND_COMPOSER_STATUS_RUNNING" },
+              { bcId: PROJ, name: "Eldar Data Uploads", projectMetadata: { appearance: {} } }];
+    },
+  };
+  const ok = await cursor.fetchProjects(io, cache);
+  assert.deepEqual(ok.composers.map((c) => [c.id, c.manager, c.isProject]), [["bc-w1", PROJ, false], [PROJ, "", true]]);
+  fail = true;
+  assert.deepEqual((await cursor.fetchProjects(io, cache)).composers, ok.composers);
+  cache.at -= 3600;
+  const stale = await cursor.fetchProjects(io, cache);
+  assert.equal(stale.composers, null);
+  assert.match(stale.error, /HTTP 503/);
+});
+
 // --- herdr: fixture captured from a real `ssh dexter herdr agent list` (2026-08-27)
 
 const herdrFixture = {

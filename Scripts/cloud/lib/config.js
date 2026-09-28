@@ -15,7 +15,9 @@ const DEFAULTS = {
   // openIn "app" = the vendor's desktop app (cursor:// run deep link; devin://
   // focuses Devin Desktop — no per-session deep link exists); "web" = the
   // thread-precise browser URL.
-  cursor: { enabled: true, apiKey: "", openIn: "app", recentHours: 48 },
+  // projects: fold Cursor Projects (a coordinator + its worker agents) into one
+  // row, using Cursor.app's login — see adapters/cursor.js.
+  cursor: { enabled: true, apiKey: "", openIn: "app", recentHours: 48, projects: true },
   devin: { enabled: true, apiKey: "", orgId: "", openIn: "app", recentHours: 48,
            showSuspended: true, suspendedHours: 24 },
   codex: { enabled: true, bin: "codex", pollSeconds: 60, recentHours: 48 },

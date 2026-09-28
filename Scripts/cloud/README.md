@@ -7,6 +7,18 @@ poller's pid). Clicking a row opens the run where it lives — cursor.com /
 app.devin.ai / chatgpt.com. No changes to the app beyond the protocol's
 optional `url` field.
 
+**Cursor Projects** (a coordinator agent that delegates to a rolling set of
+worker agents) show up as one row per Project, with a "Project" chip. The row
+is working while the coordinator or any of its agents is. Its label counts the
+agents at work ("2 agents working", "Coordinating · 1 agent") and it names the
+newest one. A click opens the Project in Cursor. The public API lists workers
+as unrelated agents, so the grouping comes from Cursor's own backend
+(`BackgroundComposerService/ListBackgroundComposers`: a worker's
+`managerAgentId`). It is read with the Cursor.app login, which is taken
+read-only from Cursor's state DB and never written or logged. Without that
+login (app signed out, not on macOS), or with `"projects": false`, agents stay
+one row each as before, and the poller logs a single line saying so.
+
 A fourth adapter covers **remote Herdr machines**: `ssh <host> herdr agent
 list` surfaces every agent Herdr recognizes there (no AgentBar hooks needed on
 the remote). Those rows aren't cloud rows — they name the remote pane, and a
@@ -75,6 +87,7 @@ Config `~/.agentbar/cloud.json` (chmod 600 — it holds API keys):
   "syntheticErrorRow": true,   // one clickable "<vendor>: auth failed" row on persistent failure
   "cursor": { "enabled": true, "apiKey": "…",  // cursor.com/dashboard -> API Keys
               "openIn": "app",                 // cursor:// run deep link; "web" = cursor.com/agents/<id>
+              "projects": true,                // one row per Project (uses Cursor.app's login)
               "apiVersion": "v1" },            // "v0" = legacy status-on-agent endpoint
   "devin":  { "enabled": true, "apiKey": "…",  // app.devin.ai Settings -> API Keys
               "openIn": "app",                 // focuses Devin Desktop (no per-session deep link

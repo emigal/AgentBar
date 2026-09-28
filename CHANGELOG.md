@@ -6,6 +6,14 @@ All notable changes to AgentBar are documented here. This project follows
 ## Unreleased
 
 ### Added
+- **Cursor Projects.** A Project (a coordinator that keeps delegating to worker
+  agents) is one row with a "Project" chip. It shows as working while the
+  coordinator or any of its agents is, even when the coordinator itself is
+  idle, which used to make an active Project look finished. The label counts
+  the agents at work and names the newest one. A click opens the Project in
+  Cursor. The grouping comes from Cursor's own backend, read with the
+  Cursor.app login. Without that login, rows stay one per agent. Turn it off
+  with `"projects": false` under `cursor` in `~/.agentbar/cloud.json`.
 - **Omnigent.** Sessions on a self-hosted Omnigent server show up as rows —
   Claude Code, Codex, Pi… each under its own mascot, with an "Omnigent" chip and
   `folder@host`. The cloud poller reads `GET /v1/sessions` with the Omnigent
