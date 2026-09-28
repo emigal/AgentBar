@@ -196,14 +196,52 @@ enum AgentActions {
         guard s.entrypoint == "claude-desktop" else { return nil }
         let id = s.id
         let low = id.lowercased()
-        if low.hasPrefix("local_") {
-            return URL(string: "claude://claude.ai/local_sessions/\(id)")
+        if low.hasPrefix("local_") { return codeContinueURL(id) }
+        if let local = codeAppSessionID(forCLISession: id) {
+            return codeContinueURL(local)
         }
         var thread = id
         if low.hasPrefix("rcw-") { thread = "cse_" + id.dropFirst(4) }
         else if low.hasPrefix("session_") { thread = "cse_" + id.dropFirst("session_".count) }
         else if !low.hasPrefix("cse_") { return nil }
         return URL(string: "claude://claude.ai/cowork/\(thread)")
+    }
+
+    /// A Code-tab session's hooks report the CLI's own session id, while the app
+    /// addresses it as `local_<uuid>`. The app's per-session metadata
+    /// (`claude-code-sessions/<account>/<org>/local_*.json`) links the two through
+    /// `cliSessionId`. Read only on a click: the files can run to hundreds of KB.
+    private static func codeAppSessionID(forCLISession cli: String) -> String? {
+        let fm = FileManager.default
+        let root = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Claude/claude-code-sessions",
+                                    isDirectory: true)
+        let needle = Data(cli.utf8)
+        let dirs = { (url: URL) -> [URL] in
+            ((try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil,
+                                          options: [.skipsHiddenFiles])) ?? [])
+        }
+        for account in dirs(root) {
+            for org in dirs(account) {
+                for f in dirs(org) where f.lastPathComponent.hasPrefix("local_")
+                    && f.pathExtension == "json" {
+                    guard let data = try? Data(contentsOf: f, options: .mappedIfSafe),
+                          data.range(of: needle) != nil,
+                          let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          o["cliSessionId"] as? String == cli,
+                          let id = o["sessionId"] as? String else { continue }
+                    return id
+                }
+            }
+        }
+        return nil
+    }
+
+    /// The Code tab's own entry for a local session (`local_<uuid>`). The
+    /// `claude.ai/local_sessions/…` route belongs to Cowork and lands on the
+    /// app's default view for a Code-tab thread.
+    private static func codeContinueURL(_ local: String) -> URL? {
+        URL(string: "claude://code/continue?session=\(local)")
     }
 
     private static func openApp(named name: String) {

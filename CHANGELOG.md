@@ -6,6 +6,15 @@ All notable changes to AgentBar are documented here. This project follows
 ## Unreleased
 
 ### Added
+- **Claude Code cloud sessions.** Cloud sessions you start from the Claude Code
+  app (or claude.ai/code, or Slack) show up as rows with a "Cloud" chip and the
+  repo name; a click opens the session in Claude.app. Polled by the cloud
+  poller with the Claude Code login read from the Keychain, so it is off until
+  you set `"claude": {"enabled": true}` in `~/.agentbar/cloud.json`.
+- **Claude Code app.** Code-tab sessions were already listed through the Claude
+  hooks; a click now opens that session's own thread in Claude.app instead of
+  just bringing the app forward. The hook's session id is matched to the app's
+  `local_…` id through its `claude-code-sessions` metadata.
 - **Cursor Projects.** A Project (a coordinator that keeps delegating to worker
   agents) is one row with a "Project" chip. It shows as working while the
   coordinator or any of its agents is, even when the coordinator itself is

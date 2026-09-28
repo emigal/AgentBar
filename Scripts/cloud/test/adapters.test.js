@@ -8,6 +8,7 @@ const devin = require("../adapters/devin");
 const codex = require("../adapters/codex");
 const herdr = require("../adapters/herdr");
 const omnigent = require("../adapters/omnigent");
+const claude = require("../adapters/claude");
 const { keepRow, toProtocolRow, epoch } = require("../lib/policy");
 const { safeId } = require("../lib/state");
 const { DEFAULTS } = require("../lib/config");
@@ -564,4 +565,49 @@ test("epoch: ISO, numeric seconds, numeric ms; garbage in, 0 out", () => {
   assert.equal(epoch(1787641783199), 1787641783);     // milliseconds collapse to seconds
   assert.equal(epoch("nope"), 0);
   assert.equal(epoch(undefined), 0);
+});
+
+// --- claude: shape captured from a real GET /v1/sessions (2026-09-28)
+
+const claudeFixture = {
+  data: [
+    { id: "session_run", session_status: "running", environment_kind: "anthropic_cloud",
+      title: "Cloud VM setup", created_at: iso(300), updated_at: iso(5),
+      session_context: { sources: [{ type: "git_repository", url: "https://github.com/acme/widgets" }] } },
+    { id: "session_idle", session_status: "idle", environment_kind: "anthropic_cloud",
+      title: "Fix flaky test", created_at: iso(900), updated_at: iso(600),
+      session_context: { outcomes: [{ type: "git_repository", git_info: { repo: "acme/gadgets" } }] } },
+    { id: "session_wait", session_status: "waiting", environment_kind: "anthropic_cloud",
+      title: "Needs a call", updated_at: iso(60), session_context: {} },
+    { id: "session_gone", session_status: "archived", environment_kind: "anthropic_cloud",
+      title: "Old", updated_at: iso(60), session_context: {} },
+    { id: "session_bridge", session_status: "running", environment_kind: "bridge",
+      title: "Remote control mirror", updated_at: iso(5), session_context: {} },
+    { id: "session_new", session_status: "somenewstatus", environment_kind: "anthropic_cloud",
+      title: "Weird", updated_at: iso(5), session_context: {} },
+  ],
+};
+
+test("claude: cloud sessions map to rows; bridge mirrors and archived are skipped", () => {
+  const { rows, warnings } = claude.normalize(claudeFixture, DEFAULTS.claude, NOW);
+  const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+  assert.equal(byId.session_bridge, undefined);
+  assert.equal(byId.session_run.state, "thinking");
+  assert.equal(byId.session_run.project, "widgets");
+  assert.equal(byId.session_run.prompt, "Cloud VM setup");
+  assert.equal(byId.session_run.url, "claude://code/session_run");
+  const web = claude.normalize(claudeFixture, { ...DEFAULTS.claude, openIn: "web" }, NOW).rows;
+  assert.equal(web[0].url, "https://claude.ai/code/session_run");
+  assert.equal(byId.session_idle.state, "done");
+  assert.equal(byId.session_idle.project, "gadgets");
+  assert.equal(byId.session_wait.state, "question");
+  assert.equal(byId.session_wait.project, "Claude Code");
+  assert.equal(byId.session_gone.state, null);
+  assert.equal(byId.session_new.state, "idle");
+  assert.deepEqual(warnings, ['unknown claude session status "somenewstatus"']);
+  assert.equal(keepRow(byId.session_gone, DEFAULTS, NOW), false);
+  const row = toProtocolRow(byId.session_run, claude, NOW, 1);
+  assert.equal(row.agent, "claude");
+  assert.equal(row.entrypoint, "cloud");
+  assert.equal(row.sessionId, "cloud-claude-session_run");
 });

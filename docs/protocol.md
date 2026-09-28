@@ -37,7 +37,8 @@ max 64 chars (fallback `"unknown"`). The file name is the session's identity;
   "cwd": "/path/to/project",
   "sessionId": "abc-123",
   "entrypoint": "cli",         // "cli" | "claude-desktop" | "antigravity-app" | "cursor-app" | "cloud" | "" — which surface hosts it
-                               // "claude-desktop" also covers Cowork: the row opens the app, not a terminal
+                               // "claude-desktop" also covers Cowork and the Code tab: the row opens the app, not a terminal
+                               // (a Code-tab row deep-links to its own thread, resolved at click time)
                                // "cursor-app" = Cursor IDE / Agents window: the row opens Cursor, not a terminal
                                // "cloud" = the session runs on a vendor's infrastructure; the row opens `url`
   "term_program": "WarpTerminal", // $TERM_PROGRAM of the hosting terminal ("" ok)

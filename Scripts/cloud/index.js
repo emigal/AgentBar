@@ -26,6 +26,7 @@ const ADAPTERS = [
   require("./adapters/codex"),
   require("./adapters/herdr"),
   require("./adapters/omnigent"),
+  require("./adapters/claude"),
 ];
 
 const MAX_FAILURES = 10; // ~5 min at the default cadence before rows are declared stale
@@ -33,11 +34,13 @@ const FIX_URLS = {
   cursor: "https://cursor.com/dashboard",
   devin: "https://app.devin.ai/settings",
   codex: "https://chatgpt.com/codex",
+  claude: "https://claude.ai/code",
 };
 const FIX_LABELS = {
   cursor: "Cursor: check API key (cloud.json)",
   devin: "Devin: check API key (cloud.json)",
   codex: "Codex: run `codex login`",
+  claude: "Claude: cloud poll failed (open the Claude app to renew its login)",
   herdr: "Herdr: remote poll failed (check ssh)",
   omnigent: "Omnigent: poll failed (server down, or run `omnigent login`)",
 };

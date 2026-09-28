@@ -239,6 +239,7 @@ rm -f ~/.pi/agent/extensions/agentbar.ts
 | OpenCode | working / approval / done / failed | yes | prompt chevron | plugin in `~/.config/opencode/plugins/` (auto-installed if OpenCode is installed); observe-only |
 | Pi | working / done / failed | yes | π | extension in `~/.pi/agent/extensions/` (auto-installed if Pi is installed); observe-only |
 | Omnigent (self-hosted server) | working / needs you / done / failed | yes — the exact session in Omnigent.app | the running agent's own (Claude, Codex, Pi…); a ring for the rest | polled by the cloud poller (`Scripts/cloud`, `"omnigent": {"enabled": true}` in `~/.agentbar/cloud.json`) with the Omnigent CLI's login; app links need the server on https or localhost, otherwise clicks open the session in the browser |
+| Claude Code cloud sessions | working / needs you / done | yes — the session in Claude.app | Claude's | polled by the cloud poller (`"claude": {"enabled": true}` in `~/.agentbar/cloud.json`) with the Claude Code login read from the Keychain; Remote Control mirrors of local sessions are skipped |
 | Google Antigravity | working / done | yes | pixel rainbow arch + dot-matrix | hooks in `~/.gemini/antigravity{,-cli}/hooks.json` (auto-wired); desktop 2.3.x only honors per-workspace `.agents/hooks.json`, and only `PostToolUse` fires — quiet sessions decay to done |
 
 Hook readiness: Claude Code, Codex (`notify`), Cursor (`hooks.json`), Gemini

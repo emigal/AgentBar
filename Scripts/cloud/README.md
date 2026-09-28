@@ -71,6 +71,22 @@ sudo tailscale serve --bg --https=6443 http://<tailscale-ip>:6767
 then point Omnigent.app at `https://<box>.<tailnet>.ts.net:6443`. Rows switch
 to app links on the next poll.
 
+A sixth adapter covers **Claude Code cloud sessions** (claude.ai/code) —
+the ones you start from the Claude Code app's cloud environments, the web, or
+Slack. Each becomes a row under the Claude mascot with a "Cloud" chip and the
+repo name; a click opens the session in Claude.app (`"openIn": "web"` for claude.ai/code). Remote Control mirrors of
+local sessions (`environment_kind: "bridge"`) are skipped, since the hooks
+already report those. There is no public API, so the poller reads the session
+list Claude Code itself uses (`GET /v1/sessions`) with the CLI's login: the
+OAuth access token in the Keychain item `Claude Code-credentials`, read-only.
+It is never written, logged or refreshed here (the app owns the refresh token),
+so a poll fails until the app renews an expired one. Because it is a credential
+read, it is off by default and macOS may ask to allow access once:
+
+```json
+{ "claude": { "enabled": true } }
+```
+
 ## Setup
 
 ```bash
