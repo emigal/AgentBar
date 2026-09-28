@@ -7,3 +7,6 @@ node_modules/
 .build/
 .swiftpm/
 error.log
+
+# Pi agent working state
+.pi/
